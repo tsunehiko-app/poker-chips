@@ -21,6 +21,25 @@ function CreateRoom() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [useAnte, setUseAnte] = useState(false);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+
+  const startEdit = (field: string, value: number) => {
+    setEditingField(field);
+    setEditText(String(value));
+  };
+
+  const commitEdit = (field: string, min: number) => {
+    const val = Number(editText);
+    if (!isNaN(val) && val >= min) {
+      const newSettings = { ...settings, [field]: val };
+      if (useAnte && field === 'bigBlind') {
+        newSettings.ante = val;
+      }
+      setSettings(newSettings);
+    }
+    setEditingField(null);
+  };
 
   const handleCreate = () => {
     if (!hostName.trim()) {
@@ -121,15 +140,71 @@ function CreateRoom() {
           </div>
         </div>
 
-        {/* 設定サマリ */}
-        <div className="settings-summary">
-          <div className="summary-item">
-            <span className="summary-label">ブラインド</span>
-            <span className="summary-value">{settings.smallBlind} / {settings.bigBlind}</span>
+        {/* 各値の編集エリア */}
+        <div className="settings-edit-area">
+          <div className="edit-field">
+            <span className="edit-label">チップ</span>
+            {editingField === 'initialChips' ? (
+              <input
+                type="number"
+                className="edit-input"
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onBlur={() => commitEdit('initialChips', 10)}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                autoFocus
+                inputMode="numeric"
+              />
+            ) : (
+              <button className="edit-value-btn" onClick={() => startEdit('initialChips', settings.initialChips)}>
+                {settings.initialChips.toLocaleString()}
+              </button>
+            )}
           </div>
-          <div className="summary-item">
-            <span className="summary-label">スタック</span>
-            <span className="summary-value">{Math.floor(settings.initialChips / settings.bigBlind)} BB</span>
+
+          <div className="edit-field">
+            <span className="edit-label">SB</span>
+            {editingField === 'smallBlind' ? (
+              <input
+                type="number"
+                className="edit-input"
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onBlur={() => commitEdit('smallBlind', 1)}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                autoFocus
+                inputMode="numeric"
+              />
+            ) : (
+              <button className="edit-value-btn" onClick={() => startEdit('smallBlind', settings.smallBlind)}>
+                {settings.smallBlind}
+              </button>
+            )}
+          </div>
+
+          <div className="edit-field">
+            <span className="edit-label">BB</span>
+            {editingField === 'bigBlind' ? (
+              <input
+                type="number"
+                className="edit-input"
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onBlur={() => commitEdit('bigBlind', 1)}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                autoFocus
+                inputMode="numeric"
+              />
+            ) : (
+              <button className="edit-value-btn" onClick={() => startEdit('bigBlind', settings.bigBlind)}>
+                {settings.bigBlind}
+              </button>
+            )}
+          </div>
+
+          <div className="edit-field">
+            <span className="edit-label">スタック</span>
+            <span className="edit-value-static">{Math.floor(settings.initialChips / settings.bigBlind)} BB</span>
           </div>
         </div>
 
