@@ -1,0 +1,617 @@
+import {
+  GameState,
+  GamePhase,
+  GameSettings,
+  Player,
+  PlayerAction,
+  PlayerStatus,
+  PotState,
+  AvailableActions,
+  HandResult,
+  FinalResult,
+} from '../../../shared/types';
+import { calculatePots, distributePots } from './PotCalculator';
+
+export class GameManager {
+  private gameState: GameState;
+  private accumulatedPot: number = 0; // ラウンド間で蓄積されるポット
+  private lastRaiserId: string | null = null; // 最後にレイズしたプレイヤー
+  private actedInRound: Set<string> = new Set(); // このラウンドでアクション済みのプレイヤー
+
+  constructor(
+    private roomCode: string,
+    settings: GameSettings,
+    players: Player[]
+  ) {
+    this.gameState = {
+      phase: 'waiting',
+      players: players.map((p) => ({ ...p })),
+      dealerIndex: -1, // startNewHandで0に設定される
+      currentPlayerIndex: 0,
+      pot: { main: 0, sidePots: [], total: 0 },
+      currentBet: 0,
+      handNumber: 0,
+      settings: { ...settings },
+    };
+  }
+
+  getState(): GameState {
+    return { ...this.gameState };
+  }
+
+  /**
+   * 新しいハンドを開始する
+   */
+  startNewHand(): GameState {
+    const state = this.gameState;
+    state.handNumber++;
+
+    // 全プレイヤーの状態をリセット（busted以外）
+    state.players.forEach((p) => {
+      if (p.status !== 'busted') {
+        p.status = 'active';
+        p.currentBet = 0;
+        p.totalBet = 0;
+      }
+    });
+
+    // ポットリセット
+    state.pot = { main: 0, sidePots: [], total: 0 };
+    state.currentBet = 0;
+    this.accumulatedPot = 0;
+    this.actedInRound.clear();
+    this.lastRaiserId = null;
+
+    // ディーラーボタンを次のアクティブプレイヤーに移動
+    state.dealerIndex = this.findNextActivePlayer(state.dealerIndex);
+
+    // SB, BBの設定
+    const activePlayers = this.getActivePlayers();
+
+    if (activePlayers.length === 2) {
+      // ヘッズアップ: ディーラー=SB、もう一人=BB
+      const sbIndex = state.dealerIndex;
+      const bbIndex = this.findNextActivePlayer(sbIndex);
+      this.postBlind(sbIndex, state.settings.smallBlind);
+      this.postBlind(bbIndex, state.settings.bigBlind);
+      state.currentBet = state.settings.bigBlind;
+      // ヘッズアップではSB(ディーラー)からアクション開始
+      state.currentPlayerIndex = sbIndex;
+    } else if (activePlayers.length >= 3) {
+      const sbIndex = this.findNextActivePlayer(state.dealerIndex);
+      const bbIndex = this.findNextActivePlayer(sbIndex);
+      this.postBlind(sbIndex, state.settings.smallBlind);
+      this.postBlind(bbIndex, state.settings.bigBlind);
+      state.currentBet = state.settings.bigBlind;
+      // プリフロップ: BBの次からアクション開始
+      state.currentPlayerIndex = this.findNextActivePlayer(bbIndex);
+    }
+
+    state.phase = 'preflop';
+    state.lastAction = undefined;
+
+    return this.getState();
+  }
+
+  /**
+   * ブラインドを投稿する
+   */
+  private postBlind(playerIndex: number, amount: number): void {
+    const player = this.gameState.players[playerIndex];
+    if (player.chips <= amount) {
+      // チップが足りない場合はオールイン
+      player.currentBet = player.chips;
+      player.chips = 0;
+      player.status = 'allin';
+    } else {
+      player.currentBet = amount;
+      player.chips -= amount;
+    }
+  }
+
+  /**
+   * プレイヤーのアクションを処理する
+   * @returns handComplete: ハンド終了か, roundComplete: ラウンド終了か
+   */
+  handleAction(
+    playerId: string,
+    action: PlayerAction,
+    amount?: number
+  ): { handComplete: boolean; roundComplete: boolean; autoWin: boolean } {
+    const state = this.gameState;
+    const playerIndex = state.players.findIndex((p) => p.id === playerId);
+    if (playerIndex === -1) {
+      throw new Error('プレイヤーが見つかりません');
+    }
+
+    const player = state.players[playerIndex];
+    if (playerIndex !== state.currentPlayerIndex) {
+      throw new Error('あなたのターンではありません');
+    }
+    if (player.status !== 'active') {
+      throw new Error('アクションできない状態です');
+    }
+
+    let actionAmount = 0;
+
+    switch (action) {
+      case 'fold':
+        player.status = 'folded';
+        actionAmount = 0;
+        break;
+
+      case 'check':
+        if (player.currentBet < state.currentBet) {
+          throw new Error('チェックできません。コールまたはレイズしてください');
+        }
+        actionAmount = 0;
+        break;
+
+      case 'call': {
+        const callAmount = state.currentBet - player.currentBet;
+        if (callAmount <= 0) {
+          throw new Error('コールする必要はありません');
+        }
+        if (player.chips <= callAmount) {
+          // チップが足りない場合はオールイン
+          actionAmount = player.chips;
+          player.currentBet += player.chips;
+          player.chips = 0;
+          player.status = 'allin';
+        } else {
+          actionAmount = callAmount;
+          player.chips -= callAmount;
+          player.currentBet += callAmount;
+        }
+        break;
+      }
+
+      case 'raise': {
+        const raiseAmount = amount || 0;
+        if (raiseAmount <= 0) {
+          throw new Error('レイズ額を指定してください');
+        }
+        const totalBet = raiseAmount;
+        const additionalChips = totalBet - player.currentBet;
+
+        if (additionalChips > player.chips) {
+          throw new Error('チップが足りません');
+        }
+        if (totalBet <= state.currentBet) {
+          throw new Error('現在のベット以上にレイズしてください');
+        }
+
+        const minRaise = state.currentBet + state.settings.bigBlind;
+        if (totalBet < minRaise && additionalChips < player.chips) {
+          throw new Error(`最低レイズ額は ${minRaise} です`);
+        }
+
+        player.chips -= additionalChips;
+        player.currentBet = totalBet;
+        state.currentBet = totalBet;
+        actionAmount = totalBet;
+        this.lastRaiserId = playerId;
+        // レイズ時は他のプレイヤーのacted状態をリセット
+        this.actedInRound.clear();
+        break;
+      }
+
+      case 'allin': {
+        const allInAmount = player.chips;
+        player.currentBet += allInAmount;
+        actionAmount = player.currentBet;
+        player.chips = 0;
+        player.status = 'allin';
+
+        if (player.currentBet > state.currentBet) {
+          state.currentBet = player.currentBet;
+          this.lastRaiserId = playerId;
+          this.actedInRound.clear();
+        }
+        break;
+      }
+    }
+
+    // アクション済みとしてマーク
+    this.actedInRound.add(playerId);
+
+    // lastActionを記録
+    state.lastAction = {
+      playerId,
+      action,
+      amount: actionAmount,
+    };
+
+    // 1人だけ残った場合はハンド終了
+    const activePlayers = this.getActivePlayers();
+    const nonFoldedPlayers = state.players.filter(
+      (p) => p.status !== 'folded' && p.status !== 'busted'
+    );
+
+    if (nonFoldedPlayers.length === 1) {
+      return { handComplete: true, roundComplete: true, autoWin: true };
+    }
+
+    // 全員がオールインまたはフォールドで、アクティブプレイヤーが0人なら自動進行
+    if (activePlayers.length === 0) {
+      // 誰もアクションできるプレイヤーがいない → ラウンドを自動的に進める
+      return { handComplete: false, roundComplete: true, autoWin: false };
+    }
+
+    // アクティブプレイヤーが1人だけ残っている場合
+    // → その人が現在のベットに追いついていて、アクション済みならラウンド完了
+    // → まだベットに追いついていないなら、コール/フォールドの機会を与える
+    if (activePlayers.length === 1) {
+      const remaining = activePlayers[0];
+      if (
+        this.actedInRound.has(remaining.id) &&
+        remaining.currentBet >= state.currentBet
+      ) {
+        return { handComplete: false, roundComplete: true, autoWin: false };
+      }
+      // まだアクションが必要な場合はラウンド継続（isRoundCompleteで判定）
+    }
+
+    // ラウンド終了判定
+    if (this.isRoundComplete()) {
+      return { handComplete: false, roundComplete: true, autoWin: false };
+    }
+
+    // 次のプレイヤーに移動
+    state.currentPlayerIndex = this.findNextActivePlayer(playerIndex);
+
+    return { handComplete: false, roundComplete: false, autoWin: false };
+  }
+
+  /**
+   * ラウンドが完了したかチェック
+   */
+  private isRoundComplete(): boolean {
+    const state = this.gameState;
+    const activePlayers = state.players.filter(
+      (p) => p.status === 'active'
+    );
+
+    // アクティブプレイヤーが全員同額をベットし、全員がアクション済み
+    for (const player of activePlayers) {
+      if (!this.actedInRound.has(player.id)) {
+        return false;
+      }
+      if (player.currentBet !== state.currentBet) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * フェーズを進める (preflop→flop→turn→river→showdown)
+   */
+  advancePhase(): GameState {
+    const state = this.gameState;
+    const phaseOrder: GamePhase[] = [
+      'preflop',
+      'flop',
+      'turn',
+      'river',
+      'showdown',
+    ];
+    const currentIndex = phaseOrder.indexOf(state.phase);
+    if (currentIndex === -1 || currentIndex >= phaseOrder.length - 1) {
+      throw new Error('これ以上フェーズを進められません');
+    }
+
+    // 現在のベットをポットに蓄積
+    this.collectBets();
+
+    const nextPhase = phaseOrder[currentIndex + 1];
+    state.phase = nextPhase;
+
+    if (nextPhase === 'showdown') {
+      return this.getState();
+    }
+
+    // ラウンドリセット
+    state.currentBet = 0;
+    this.actedInRound.clear();
+    this.lastRaiserId = null;
+
+    // ポストフロップ: ディーラーの左の最初のアクティブプレイヤーから開始
+    const firstActive = this.findNextActivePlayer(state.dealerIndex);
+    state.currentPlayerIndex = firstActive;
+
+    return this.getState();
+  }
+
+  /**
+   * 全プレイヤーのベットをポットに集める
+   */
+  private collectBets(): void {
+    const state = this.gameState;
+    const pots = calculatePots(state.players);
+
+    // 蓄積されたポットに加算
+    this.accumulatedPot += pots.total;
+
+    // ポット状態を更新（蓄積分を含む）
+    state.pot = {
+      main: pots.main,
+      sidePots: pots.sidePots,
+      total: this.accumulatedPot,
+    };
+
+    // 全プレイヤーのtotalBetに加算してからcurrentBetをリセット
+    state.players.forEach((p) => {
+      p.totalBet += p.currentBet;
+      p.currentBet = 0;
+    });
+  }
+
+  /**
+   * 勝者を選択してポットを分配する
+   */
+  selectWinners(winnerIds: string[]): HandResult {
+    const state = this.gameState;
+
+    // まだ未回収のベットがあれば集める
+    this.collectBets();
+
+    // 蓄積された全ポットを勝者に分配
+    const totalPot = this.accumulatedPot;
+    const validWinners = winnerIds.filter((id) => {
+      const p = state.players.find((pl) => pl.id === id);
+      return p && p.status !== 'folded' && p.status !== 'busted';
+    });
+
+    const playerWinnings = new Map<string, number>();
+    const distributions: { potIndex: number; amount: number; winnerIds: string[] }[] = [];
+
+    if (validWinners.length > 0 && totalPot > 0) {
+      const share = Math.floor(totalPot / validWinners.length);
+      const remainder = totalPot - share * validWinners.length;
+      validWinners.forEach((id, idx) => {
+        const amt = share + (idx === 0 ? remainder : 0);
+        playerWinnings.set(id, amt);
+      });
+      distributions.push({
+        potIndex: 0,
+        amount: totalPot,
+        winnerIds: validWinners,
+      });
+    }
+
+    // チップを勝者に付与（amountは純利益 = 獲得額 - 自分のベット額）
+    const winners: HandResult['winners'] = [];
+    playerWinnings.forEach((grossAmount, playerId) => {
+      const player = state.players.find((p) => p.id === playerId);
+      if (player) {
+        player.chips += grossAmount;
+        const netProfit = grossAmount - player.totalBet;
+        winners.push({
+          playerId: player.id,
+          playerName: player.name,
+          amount: netProfit,
+        });
+      }
+    });
+
+    // バスト判定
+    const bustedPlayers: HandResult['bustedPlayers'] = [];
+    state.players.forEach((p) => {
+      if (p.chips === 0 && p.status !== 'busted') {
+        p.status = 'busted';
+        bustedPlayers.push({
+          playerId: p.id,
+          playerName: p.name,
+        });
+      }
+    });
+
+    // ポットリセット
+    state.pot = { main: 0, sidePots: [], total: 0 };
+    this.accumulatedPot = 0;
+
+    const result: HandResult = {
+      winners,
+      potDistribution: distributions,
+      bustedPlayers,
+    };
+
+    return result;
+  }
+
+  /**
+   * 1人だけ残った場合の自動勝利処理
+   */
+  autoResolveWinner(): HandResult {
+    const state = this.gameState;
+    const nonFolded = state.players.filter(
+      (p) => p.status !== 'folded' && p.status !== 'busted'
+    );
+
+    if (nonFolded.length !== 1) {
+      throw new Error('自動勝利の条件を満たしていません');
+    }
+
+    return this.selectWinners([nonFolded[0].id]);
+  }
+
+  /**
+   * リバイ処理
+   */
+  handleRebuy(playerId: string): Player {
+    const state = this.gameState;
+    const player = state.players.find((p) => p.id === playerId);
+    if (!player) {
+      throw new Error('プレイヤーが見つかりません');
+    }
+    if (player.status !== 'busted') {
+      throw new Error('バストしていないプレイヤーはリバイできません');
+    }
+
+    player.chips = state.settings.initialChips;
+    player.rebuyCount++;
+    player.status = 'sitting_out'; // 次のハンドからアクティブ
+
+    return { ...player };
+  }
+
+  /**
+   * プレイヤーが取れるアクションを返す
+   */
+  getAvailableActions(playerId: string): AvailableActions {
+    const state = this.gameState;
+    const player = state.players.find((p) => p.id === playerId);
+
+    const noActions: AvailableActions = {
+      canFold: false,
+      canCheck: false,
+      canCall: false,
+      callAmount: 0,
+      canRaise: false,
+      minRaise: 0,
+      maxRaise: 0,
+      canAllIn: false,
+      allInAmount: 0,
+    };
+
+    if (!player || player.status !== 'active') {
+      return noActions;
+    }
+
+    const playerIndex = state.players.indexOf(player);
+    if (playerIndex !== state.currentPlayerIndex) {
+      return noActions;
+    }
+
+    const callAmount = state.currentBet - player.currentBet;
+    const canCheck = callAmount === 0;
+    const canCall = callAmount > 0 && player.chips > callAmount;
+    const minRaise = state.currentBet + state.settings.bigBlind;
+    const maxRaise = player.currentBet + player.chips; // トータルベット
+    const canRaise = player.chips > callAmount && maxRaise >= minRaise;
+    const canAllIn = player.chips > 0;
+    const allInAmount = player.chips;
+
+    return {
+      canFold: true,
+      canCheck,
+      canCall,
+      callAmount: Math.min(callAmount, player.chips),
+      canRaise,
+      minRaise,
+      maxRaise,
+      canAllIn,
+      allInAmount,
+    };
+  }
+
+  /**
+   * 最終結果を計算する
+   */
+  getFinalResults(): FinalResult[] {
+    const state = this.gameState;
+    const results: FinalResult[] = state.players.map((p) => {
+      const totalInvested =
+        state.settings.initialChips * (1 + p.rebuyCount);
+      return {
+        playerId: p.id,
+        playerName: p.name,
+        finalChips: p.chips,
+        initialChips: state.settings.initialChips,
+        rebuyCount: p.rebuyCount,
+        totalInvested,
+        profit: p.chips - totalInvested,
+        rank: 0,
+      };
+    });
+
+    // チップ数の降順でランク付け
+    results.sort((a, b) => b.finalChips - a.finalChips);
+    results.forEach((r, idx) => {
+      r.rank = idx + 1;
+    });
+
+    return results;
+  }
+
+  /**
+   * ハンドが完了したかチェック（1人だけ残っている）
+   */
+  isHandComplete(): boolean {
+    const nonFolded = this.gameState.players.filter(
+      (p) => p.status !== 'folded' && p.status !== 'busted'
+    );
+    return nonFolded.length <= 1;
+  }
+
+  /**
+   * アクティブプレイヤー数（active状態のプレイヤー。allin/foldedは含まない）
+   */
+  getActivePlayersCount(): number {
+    return this.getActivePlayers().length;
+  }
+
+  /**
+   * active状態のプレイヤーを取得
+   */
+  private getActivePlayers(): Player[] {
+    return this.gameState.players.filter((p) => p.status === 'active');
+  }
+
+  /**
+   * 次のアクティブプレイヤーのインデックスを探す
+   */
+  private findNextActivePlayer(fromIndex: number): number {
+    const players = this.gameState.players;
+    const count = players.length;
+
+    for (let i = 1; i <= count; i++) {
+      const idx = (fromIndex + i) % count;
+      const p = players[idx];
+      if (p.status === 'active') {
+        return idx;
+      }
+    }
+
+    // アクティブプレイヤーがいない場合、non-foldedの最初のプレイヤー
+    for (let i = 1; i <= count; i++) {
+      const idx = (fromIndex + i) % count;
+      const p = players[idx];
+      if (p.status !== 'folded' && p.status !== 'busted') {
+        return idx;
+      }
+    }
+
+    return fromIndex;
+  }
+
+  /**
+   * プレイヤーの接続状態を更新
+   */
+  setPlayerConnected(playerId: string, connected: boolean): void {
+    const player = this.gameState.players.find((p) => p.id === playerId);
+    if (player) {
+      player.isConnected = connected;
+    }
+  }
+
+  /**
+   * ショーダウン状態かチェック
+   */
+  isShowdown(): boolean {
+    return this.gameState.phase === 'showdown';
+  }
+
+  /**
+   * 全員オールインかチェック（アクティブプレイヤーが0-1）
+   */
+  isAllInRunout(): boolean {
+    const active = this.getActivePlayers();
+    const nonFolded = this.gameState.players.filter(
+      (p) => p.status !== 'folded' && p.status !== 'busted'
+    );
+    return active.length <= 1 && nonFolded.length > 1;
+  }
+}
