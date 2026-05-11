@@ -1267,14 +1267,14 @@ select {
   text-align: center;
 }
 
-/* --- Raise Slider --- */
-.raise-slider {
+/* --- Raise Panel (Mobile-friendly) --- */
+.raise-panel {
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .raise-header {
@@ -1288,79 +1288,123 @@ select {
   font-size: 1rem;
 }
 
-.raise-input-row {
+/* 金額 + ±ボタン行 */
+.raise-amount-row {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
 }
 
-.raise-input {
-  width: 140px;
-  text-align: center;
-  font-size: 1.4rem;
-  font-weight: 700;
-  padding: 8px 12px;
+.raise-step-btn {
+  width: 64px;
+  height: 52px;
+  border-radius: var(--radius-sm);
+  border: 2px solid rgba(255, 255, 255, 0.15);
   background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.raise-step-btn:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.raise-step-btn:disabled {
+  opacity: 0.3;
+}
+
+.raise-amount-display {
+  min-width: 120px;
+  height: 56px;
   border: 2px solid var(--accent-gold);
   border-radius: var(--radius-sm);
+  background: var(--bg-input);
   color: var(--accent-gold);
-  outline: none;
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.raise-input::-webkit-inner-spin-button,
-.raise-input::-webkit-outer-spin-button {
+.raise-amount-input {
+  width: 120px;
+  height: 56px;
+  border: 2px solid var(--accent-gold);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--accent-gold);
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-align: center;
+  outline: none;
   -webkit-appearance: none;
-  margin: 0;
-}
-.raise-input[type='number'] {
   -moz-appearance: textfield;
 }
 
-.raise-range {
-  width: 100%;
-  height: 6px;
+.raise-amount-input::-webkit-inner-spin-button,
+.raise-amount-input::-webkit-outer-spin-button {
   -webkit-appearance: none;
-  appearance: none;
-  background: linear-gradient(
-    to right,
-    var(--accent-gold) 0%,
-    var(--accent-gold) 50%,
-    rgba(255, 255, 255, 0.1) 50%
-  );
-  border-radius: 3px;
-  outline: none;
+  margin: 0;
 }
 
-.raise-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--accent-gold);
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.raise-range::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--accent-gold);
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.raise-range-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.raise-quick-buttons {
-  display: flex;
+/* プリセットボタン群 */
+.raise-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
+}
+
+.raise-preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  padding: 8px 2px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  gap: 2px;
+}
+
+.raise-preset-btn.active {
+  border-color: var(--accent-gold);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent-gold);
+}
+
+.raise-preset-btn:active {
+  transform: scale(0.96);
+}
+
+.preset-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.preset-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.raise-confirm-btn {
+  height: 52px;
+  font-size: 1.1rem;
+  font-weight: 800;
 }
 
 /* --- Winner Selector --- */

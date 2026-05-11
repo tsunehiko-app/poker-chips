@@ -6,7 +6,7 @@ interface RaiseSliderProps {
   potTotal: number;
   onConfirm: (amount: number) => void;
   onCancel: () => void;
-  isBet?: boolean; // true = 最初のベット, false = レイズ
+  isBet?: boolean;
 }
 
 function RaiseSlider({
@@ -19,25 +19,58 @@ function RaiseSlider({
 }: RaiseSliderProps) {
   const label = isBet ? 'ベット' : 'レイズ';
   const [amount, setAmount] = useState(minRaise);
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputText, setInputText] = useState(String(minRaise));
 
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAmount(Number(e.target.value));
+  const clamp = (val: number) => Math.min(Math.max(val, minRaise), maxRaise);
+
+  // プリセット金額ボタン
+  const presets = [
+    { label: 'Min', value: minRaise },
+    { label: '1/2', value: Math.round(potTotal * 0.5) },
+    { label: '3/4', value: Math.round(potTotal * 0.75) },
+    { label: 'Pot', value: potTotal },
+    { label: 'Max', value: maxRaise },
+  ];
+
+  // +/- ボタンで増減する単位
+  const getStep = () => {
+    if (maxRaise <= 100) return 10;
+    if (maxRaise <= 500) return 25;
+    if (maxRaise <= 2000) return 50;
+    return 100;
+  };
+  const step = getStep();
+
+  const adjustAmount = (delta: number) => {
+    setAmount((prev) => clamp(prev + delta));
+  };
+
+  const handleInputTap = () => {
+    setIsEditing(true);
+    setInputText(String(amount));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = Number(e.target.value);
-    if (!isNaN(val)) {
-      setAmount(Math.min(Math.max(val, minRaise), maxRaise));
+    setInputText(e.target.value);
+  };
+
+  const handleInputBlur = () => {
+    const val = Number(inputText);
+    if (!isNaN(val) && val > 0) {
+      setAmount(clamp(val));
+    }
+    setIsEditing(false);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
     }
   };
 
-  const setQuickAmount = (fraction: number) => {
-    const potBased = Math.round(potTotal * fraction);
-    setAmount(Math.min(Math.max(potBased, minRaise), maxRaise));
-  };
-
   return (
-    <div className="raise-slider">
+    <div className="raise-panel">
       <div className="raise-header">
         <span className="raise-title">{label}額</span>
         <button className="btn btn-small btn-ghost" onClick={onCancel}>
@@ -45,61 +78,62 @@ function RaiseSlider({
         </button>
       </div>
 
-      <div className="raise-input-row">
-        <input
-          type="number"
-          className="raise-input"
-          value={amount}
-          onChange={handleInputChange}
-          min={minRaise}
-          max={maxRaise}
-        />
-      </div>
-
-      <input
-        type="range"
-        className="raise-range"
-        min={minRaise}
-        max={maxRaise}
-        step={Math.max(1, Math.floor((maxRaise - minRaise) / 100))}
-        value={amount}
-        onChange={handleSliderChange}
-      />
-
-      <div className="raise-range-labels">
-        <span>{minRaise}</span>
-        <span>{maxRaise}</span>
-      </div>
-
-      <div className="raise-quick-buttons">
+      {/* 金額表示 + ±ボタン */}
+      <div className="raise-amount-row">
         <button
-          className="btn btn-small btn-ghost"
-          onClick={() => setQuickAmount(0.5)}
+          className="raise-step-btn"
+          onClick={() => adjustAmount(-step)}
+          disabled={amount <= minRaise}
         >
-          1/2 Pot
+          −{step}
         </button>
+
+        {isEditing ? (
+          <input
+            type="number"
+            className="raise-amount-input editing"
+            value={inputText}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleInputKeyDown}
+            autoFocus
+            inputMode="numeric"
+          />
+        ) : (
+          <button className="raise-amount-display" onClick={handleInputTap}>
+            {amount.toLocaleString()}
+          </button>
+        )}
+
         <button
-          className="btn btn-small btn-ghost"
-          onClick={() => setQuickAmount(0.75)}
+          className="raise-step-btn"
+          onClick={() => adjustAmount(step)}
+          disabled={amount >= maxRaise}
         >
-          3/4 Pot
-        </button>
-        <button
-          className="btn btn-small btn-ghost"
-          onClick={() => setQuickAmount(1)}
-        >
-          Pot
-        </button>
-        <button
-          className="btn btn-small btn-ghost"
-          onClick={() => setAmount(maxRaise)}
-        >
-          Max
+          +{step}
         </button>
       </div>
 
+      {/* プリセットボタン */}
+      <div className="raise-presets">
+        {presets.map((p) => {
+          const clamped = clamp(p.value);
+          return (
+            <button
+              key={p.label}
+              className={`raise-preset-btn ${amount === clamped ? 'active' : ''}`}
+              onClick={() => setAmount(clamped)}
+            >
+              <span className="preset-label">{p.label}</span>
+              <span className="preset-value">{clamped.toLocaleString()}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 確定ボタン */}
       <button
-        className="btn btn-primary btn-full"
+        className="btn btn-primary btn-full raise-confirm-btn"
         onClick={() => onConfirm(amount)}
       >
         {label} {amount.toLocaleString()}
