@@ -239,6 +239,12 @@ function Lobby() {
                 {settings.smallBlind} / {settings.bigBlind}
               </span>
             </div>
+            {settings.ante > 0 && (
+              <div className="setting-row">
+                <span className="setting-label">アンティ</span>
+                <span className="setting-value">{settings.ante}</span>
+              </div>
+            )}
           </div>
         </div>
       )}

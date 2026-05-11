@@ -45,13 +45,15 @@ export interface GameSettings {
   initialChips: number;
   smallBlind: number;
   bigBlind: number;
-  turnTimeLimit: number; // 0 = 無制限
+  ante: number;            // 0 = アンティなし
+  turnTimeLimit: number;   // 0 = 無制限
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
   initialChips: 1000,
   smallBlind: 10,
   bigBlind: 20,
+  ante: 0,
   turnTimeLimit: 0,
 };
 

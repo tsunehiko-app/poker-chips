@@ -4,12 +4,23 @@ import { socket } from '../socket';
 import type { GameSettings } from '../../../shared/types';
 import { DEFAULT_SETTINGS } from '../../../shared/types';
 
+// チッププリセット → 自動的に100BBになるブラインド設定
+const chipConfigs: { chips: number; sb: number; bb: number; ante: number }[] = [
+  { chips: 100,  sb: 1,  bb: 2,   ante: 0 },
+  { chips: 200,  sb: 1,  bb: 2,   ante: 0 },
+  { chips: 300,  sb: 1,  bb: 3,   ante: 0 },
+  { chips: 400,  sb: 2,  bb: 4,   ante: 0 },
+  { chips: 500,  sb: 2,  bb: 5,   ante: 0 },
+  { chips: 1000, sb: 5,  bb: 10,  ante: 0 },
+];
+
 function CreateRoom() {
   const navigate = useNavigate();
   const [hostName, setHostName] = useState('');
   const [settings, setSettings] = useState<GameSettings>({ ...DEFAULT_SETTINGS });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [useAnte, setUseAnte] = useState(false);
 
   const handleCreate = () => {
     if (!hostName.trim()) {
@@ -44,6 +55,29 @@ function CreateRoom() {
     socket.on('error', onError);
   };
 
+  const selectChipConfig = (config: typeof chipConfigs[0]) => {
+    const ante = useAnte ? config.bb : 0;
+    setSettings({
+      ...settings,
+      initialChips: config.chips,
+      smallBlind: config.sb,
+      bigBlind: config.bb,
+      ante,
+    });
+  };
+
+  const toggleAnte = () => {
+    const next = !useAnte;
+    setUseAnte(next);
+    setSettings({
+      ...settings,
+      ante: next ? settings.bigBlind : 0,
+    });
+  };
+
+  // 現在選択中のconfigを探す
+  const currentConfig = chipConfigs.find((c) => c.chips === settings.initialChips);
+
   return (
     <div className="page">
       <div className="page-header">
@@ -70,45 +104,47 @@ function CreateRoom() {
       <div className="card">
         <h2 className="card-title">ゲーム設定</h2>
 
+        {/* 初期チップ選択 */}
         <div className="form-group">
           <label className="form-label">初期チップ</label>
-          <input
-            type="number"
-            className="form-input"
-            value={settings.initialChips}
-            onChange={(e) =>
-              setSettings({ ...settings, initialChips: Math.max(100, Number(e.target.value)) })
-            }
-            min={100}
-            step={100}
-          />
+          <div className="chip-config-grid">
+            {chipConfigs.map((config) => (
+              <button
+                key={config.chips}
+                className={`chip-config-btn ${settings.initialChips === config.chips ? 'active' : ''}`}
+                onClick={() => selectChipConfig(config)}
+              >
+                <span className="chip-config-amount">{config.chips.toLocaleString()}</span>
+                <span className="chip-config-blind">{config.sb}/{config.bb}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">SB</label>
-            <input
-              type="number"
-              className="form-input"
-              value={settings.smallBlind}
-              onChange={(e) =>
-                setSettings({ ...settings, smallBlind: Math.max(1, Number(e.target.value)) })
-              }
-              min={1}
-            />
+        {/* 設定サマリ */}
+        <div className="settings-summary">
+          <div className="summary-item">
+            <span className="summary-label">ブラインド</span>
+            <span className="summary-value">{settings.smallBlind} / {settings.bigBlind}</span>
           </div>
-          <div className="form-group">
-            <label className="form-label">BB</label>
-            <input
-              type="number"
-              className="form-input"
-              value={settings.bigBlind}
-              onChange={(e) =>
-                setSettings({ ...settings, bigBlind: Math.max(2, Number(e.target.value)) })
-              }
-              min={2}
-            />
+          <div className="summary-item">
+            <span className="summary-label">スタック</span>
+            <span className="summary-value">{Math.floor(settings.initialChips / settings.bigBlind)} BB</span>
           </div>
+        </div>
+
+        {/* アンティ */}
+        <div className="ante-toggle">
+          <span className="ante-label">アンティ</span>
+          <button
+            className={`toggle-btn ${useAnte ? 'on' : 'off'}`}
+            onClick={toggleAnte}
+          >
+            <span className="toggle-knob" />
+          </button>
+          {useAnte && (
+            <span className="ante-amount">{settings.ante}</span>
+          )}
         </div>
       </div>
 

@@ -87,6 +87,25 @@ export class GameManager {
       state.currentPlayerIndex = this.findNextActivePlayer(bbIndex);
     }
 
+    // アンティの徴収（BBのみ）
+    if (state.settings.ante > 0) {
+      // BBプレイヤーを特定
+      const bbPlayer = activePlayers.length === 2
+        ? state.players[this.findNextActivePlayer(state.dealerIndex)]
+        : state.players[this.findNextActivePlayer(this.findNextActivePlayer(state.dealerIndex))];
+      if (bbPlayer && bbPlayer.status !== 'busted') {
+        const anteAmount = Math.min(bbPlayer.chips, state.settings.ante);
+        bbPlayer.chips -= anteAmount;
+        bbPlayer.totalBet += anteAmount;
+        state.pot.main += anteAmount;
+        state.pot.total += anteAmount;
+        this.accumulatedPot += anteAmount;
+        if (bbPlayer.chips === 0 && bbPlayer.status !== 'allin') {
+          bbPlayer.status = 'allin';
+        }
+      }
+    }
+
     state.phase = 'preflop';
     state.lastAction = undefined;
 
