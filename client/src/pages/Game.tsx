@@ -4,6 +4,7 @@ import { socket } from '../socket';
 import HostGame from './HostGame';
 import PlayerGame from './PlayerGame';
 import TournamentBar from '../components/TournamentBar';
+import DealerAnimation from '../components/DealerAnimation';
 import type { GameState, AvailableActions, HandResult, FinalResult, PlayerAction, GamePhase, PotState, TournamentState, BlindLevel } from '../../../shared/types';
 
 export interface Toast {
@@ -23,6 +24,8 @@ function Game() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isPaused, setIsPaused] = useState(false);
   const [phaseTransition, setPhaseTransition] = useState<string | null>(null);
+  const [showDealerAnim, setShowDealerAnim] = useState(false);
+  const [dealerAnimDone, setDealerAnimDone] = useState(false);
 
   const playerId = sessionStorage.getItem('playerId');
   const isHost = sessionStorage.getItem('isHost') === 'true';
@@ -69,6 +72,10 @@ function Game() {
 
     const onGameStarted = (data: { gameState: GameState }) => {
       setGameState(data.gameState);
+      // 初回ハンドならディーラー決定アニメーションを表示
+      if (data.gameState.handNumber === 1) {
+        setShowDealerAnim(true);
+      }
     };
 
     const onYourTurn = (data: { availableActions: AvailableActions }) => {
@@ -196,6 +203,17 @@ function Game() {
 
   return (
     <div className="game-container">
+      {showDealerAnim && !dealerAnimDone && gameState && (
+        <DealerAnimation
+          players={gameState.players.filter((p) => p.status !== 'busted')}
+          dealerIndex={gameState.dealerIndex}
+          onComplete={() => {
+            setShowDealerAnim(false);
+            setDealerAnimDone(true);
+          }}
+        />
+      )}
+
       {isPaused && (
         <div className="pause-overlay">
           <div className="pause-text">一時停止中</div>
