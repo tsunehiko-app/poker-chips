@@ -62,6 +62,10 @@ function Game() {
 
     const onStateUpdate = (data: { gameState: GameState }) => {
       setGameState((prev) => {
+        // 初回受信 & Hand #1 → ディーラーアニメーション表示
+        if (!prev && data.gameState.handNumber === 1) {
+          setShowDealerAnim(true);
+        }
         // ハンド番号が変わったら前のハンド結果をクリア（新しいハンド開始）
         if (prev && data.gameState.handNumber !== prev.handNumber) {
           setHandResult(null);
@@ -71,11 +75,12 @@ function Game() {
     };
 
     const onGameStarted = (data: { gameState: GameState }) => {
-      setGameState(data.gameState);
-      // 初回ハンドならディーラー決定アニメーションを表示
-      if (data.gameState.handNumber === 1) {
-        setShowDealerAnim(true);
-      }
+      setGameState((prev) => {
+        if (!prev && data.gameState.handNumber === 1) {
+          setShowDealerAnim(true);
+        }
+        return data.gameState;
+      });
     };
 
     const onYourTurn = (data: { availableActions: AvailableActions }) => {

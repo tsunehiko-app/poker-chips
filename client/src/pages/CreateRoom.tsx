@@ -4,7 +4,7 @@ import { socket } from '../socket';
 import type { GameSettings, GameMode, StackVariance } from '../../../shared/types';
 import { DEFAULT_SETTINGS, BLIND_STRUCTURE } from '../../../shared/types';
 
-// キャッシュゲーム用チッププリセット
+// リングゲーム用チッププリセット
 const cashConfigs = [
   { chips: 100,  sb: 1,  bb: 2 },
   { chips: 200,  sb: 1,  bb: 2 },
@@ -68,7 +68,7 @@ function CreateRoom() {
     socket.on('error', onError);
   };
 
-  // --- キャッシュゲーム ---
+  // --- リングゲーム ---
   const selectCashConfig = (config: typeof cashConfigs[0]) => {
     const ante = useAnte ? config.bb : 0;
     setSettings({
@@ -192,7 +192,7 @@ function CreateRoom() {
             className={`mode-btn ${mode === 'cash' ? 'active' : ''}`}
             onClick={() => switchMode('cash')}
           >
-            キャッシュ
+            リング
           </button>
           <button
             className={`mode-btn ${mode === 'tournament' ? 'active' : ''}`}
@@ -203,7 +203,7 @@ function CreateRoom() {
         </div>
       </div>
 
-      {/* キャッシュゲーム設定 */}
+      {/* リングゲーム設定 */}
       {mode === 'cash' && (
         <div className="card">
           <h2 className="card-title">ゲーム設定</h2>
