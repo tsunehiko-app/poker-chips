@@ -343,6 +343,30 @@ select {
   font-size: 0.85rem;
 }
 
+.feedback-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.feedback-link:hover,
+.feedback-link:active {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.feedback-x-icon {
+  flex-shrink: 0;
+}
+
 /* --- Room Code Display --- */
 .room-code-card {
   text-align: center;
