@@ -13,6 +13,8 @@ export type PlayerStatus = 'active' | 'folded' | 'allin' | 'busted' | 'sitting_o
 
 export type GameMode = 'cash' | 'tournament';
 
+export type StackVariance = 'none' | 'small' | 'large';
+
 // --- プレイヤー ---
 
 export interface Player {
@@ -51,41 +53,42 @@ export interface BlindLevel {
   isBreak?: boolean;
 }
 
-// 参考ストラクチャー（80,000チップ基準）を元にした汎用ストラクチャー
+// ストラクチャー（参考: NLH Good Game 500）
 // ante = BB
 export const BLIND_STRUCTURE: BlindLevel[] = [
-  { level: 1,  sb: 25,     bb: 50,      ante: 50 },
-  { level: 2,  sb: 50,     bb: 100,     ante: 100 },
-  { level: 3,  sb: 75,     bb: 150,     ante: 150 },
-  { level: 4,  sb: 100,    bb: 200,     ante: 200 },
-  { level: 5,  sb: 150,    bb: 300,     ante: 300 },
-  { level: 6,  sb: 200,    bb: 400,     ante: 400 },
+  { level: 1,  sb: 100,    bb: 200,     ante: 200 },
+  { level: 2,  sb: 200,    bb: 300,     ante: 300 },
+  { level: 3,  sb: 200,    bb: 400,     ante: 400 },
+  { level: 4,  sb: 300,    bb: 600,     ante: 600 },
+  { level: 5,  sb: 400,    bb: 800,     ante: 800 },
   { level: 0,  sb: 0,      bb: 0,       ante: 0, isBreak: true },
-  { level: 7,  sb: 300,    bb: 600,     ante: 600 },
-  { level: 8,  sb: 400,    bb: 800,     ante: 800 },
-  { level: 9,  sb: 500,    bb: 1000,    ante: 1000 },
-  { level: 10, sb: 600,    bb: 1200,    ante: 1200 },
-  { level: 11, sb: 800,    bb: 1600,    ante: 1600 },
-  { level: 12, sb: 1000,   bb: 2000,    ante: 2000 },
+  { level: 6,  sb: 500,    bb: 1000,    ante: 1000 },
+  { level: 7,  sb: 600,    bb: 1200,    ante: 1200 },
+  { level: 8,  sb: 1000,   bb: 1500,    ante: 1500 },
+  { level: 9,  sb: 1000,   bb: 2000,    ante: 2000 },
+  { level: 10, sb: 1500,   bb: 3000,    ante: 3000 },
   { level: 0,  sb: 0,      bb: 0,       ante: 0, isBreak: true },
-  { level: 13, sb: 1500,   bb: 3000,    ante: 3000 },
-  { level: 14, sb: 2000,   bb: 4000,    ante: 4000 },
-  { level: 15, sb: 2500,   bb: 5000,    ante: 5000 },
-  { level: 16, sb: 3000,   bb: 6000,    ante: 6000 },
-  { level: 17, sb: 4000,   bb: 8000,    ante: 8000 },
-  { level: 18, sb: 5000,   bb: 10000,   ante: 10000 },
-  { level: 19, sb: 6000,   bb: 12000,   ante: 12000 },
-  { level: 20, sb: 8000,   bb: 16000,   ante: 16000 },
-  { level: 21, sb: 10000,  bb: 20000,   ante: 20000 },
-  { level: 22, sb: 15000,  bb: 30000,   ante: 30000 },
-  { level: 23, sb: 20000,  bb: 40000,   ante: 40000 },
-  { level: 24, sb: 25000,  bb: 50000,   ante: 50000 },
-  { level: 25, sb: 30000,  bb: 60000,   ante: 60000 },
-  { level: 26, sb: 40000,  bb: 80000,   ante: 80000 },
-  { level: 27, sb: 50000,  bb: 100000,  ante: 100000 },
-  { level: 28, sb: 75000,  bb: 150000,  ante: 150000 },
-  { level: 29, sb: 100000, bb: 200000,  ante: 200000 },
-  { level: 30, sb: 150000, bb: 300000,  ante: 300000 },
+  { level: 11, sb: 2000,   bb: 4000,    ante: 4000 },
+  { level: 12, sb: 3000,   bb: 6000,    ante: 6000 },
+  { level: 13, sb: 4000,   bb: 8000,    ante: 8000 },
+  { level: 14, sb: 5000,   bb: 10000,   ante: 10000 },
+  { level: 15, sb: 6000,   bb: 12000,   ante: 12000 },
+  { level: 16, sb: 10000,  bb: 15000,   ante: 15000 },
+  { level: 0,  sb: 0,      bb: 0,       ante: 0, isBreak: true },
+  { level: 17, sb: 10000,  bb: 20000,   ante: 20000 },
+  { level: 18, sb: 15000,  bb: 30000,   ante: 30000 },
+  { level: 19, sb: 20000,  bb: 40000,   ante: 40000 },
+  { level: 20, sb: 30000,  bb: 60000,   ante: 60000 },
+  { level: 21, sb: 40000,  bb: 80000,   ante: 80000 },
+  { level: 22, sb: 50000,  bb: 100000,  ante: 100000 },
+  { level: 23, sb: 60000,  bb: 120000,  ante: 120000 },
+  { level: 24, sb: 75000,  bb: 150000,  ante: 150000 },
+  { level: 25, sb: 100000, bb: 200000,  ante: 200000 },
+  { level: 26, sb: 150000, bb: 300000,  ante: 300000 },
+  { level: 27, sb: 200000, bb: 400000,  ante: 400000 },
+  { level: 28, sb: 300000, bb: 600000,  ante: 600000 },
+  { level: 29, sb: 400000, bb: 800000,  ante: 800000 },
+  { level: 30, sb: 500000, bb: 1000000, ante: 1000000 },
 ];
 
 // --- ゲーム設定 ---
@@ -103,6 +106,7 @@ export interface GameSettings {
   bigBlind: number;
   ante: number;            // 0 = アンティなし
   turnTimeLimit: number;   // 0 = 無制限
+  stackVariance: StackVariance; // スタック差
   tournament: TournamentConfig;
 }
 
@@ -113,6 +117,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   bigBlind: 20,
   ante: 0,
   turnTimeLimit: 0,
+  stackVariance: 'none',
   tournament: {
     enabled: false,
     levelDurationMin: 20,

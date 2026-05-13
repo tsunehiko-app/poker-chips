@@ -1607,6 +1607,32 @@ select {
   color: #000;
 }
 
+/* --- Stack Variance Toggle --- */
+.variance-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.variance-btn {
+  padding: 10px 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.variance-btn.active {
+  border-color: var(--accent-gold);
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-gold);
+}
+
 .mode-btn:first-child {
   border-right: 1px solid rgba(255, 255, 255, 0.08);
 }

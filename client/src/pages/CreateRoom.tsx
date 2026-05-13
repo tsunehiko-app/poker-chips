@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
-import type { GameSettings, GameMode } from '../../../shared/types';
+import type { GameSettings, GameMode, StackVariance } from '../../../shared/types';
 import { DEFAULT_SETTINGS, BLIND_STRUCTURE } from '../../../shared/types';
 
 // キャッシュゲーム用チッププリセット
@@ -17,8 +17,8 @@ const cashConfigs = [
 // トーナメント用チッププリセット
 const tournamentChips = [10000, 15000, 20000, 30000, 50000, 100000];
 
-// レベル時間プリセット（分）
-const durationPresets = [5, 10, 15, 20, 30, 60];
+// レベル時間プリセット（分）— 5分刻み
+const durationPresets = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
 
 // ブレイクを除いたレベル一覧
 const playableLevels = BLIND_STRUCTURE.filter((l) => !l.isBreak);
@@ -280,6 +280,21 @@ function CreateRoom() {
             </button>
             {useAnte && <span className="ante-amount">{settings.ante}</span>}
           </div>
+
+          <div className="form-group" style={{ marginTop: '16px' }}>
+            <label className="form-label">スタック差</label>
+            <div className="variance-toggle">
+              {([['none', 'なし'], ['small', '少し'], ['large', '大きい']] as [StackVariance, string][]).map(([val, label]) => (
+                <button
+                  key={val}
+                  className={`variance-btn ${settings.stackVariance === val ? 'active' : ''}`}
+                  onClick={() => setSettings({ ...settings, stackVariance: val })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -360,6 +375,22 @@ function CreateRoom() {
                 disabled={settings.tournament.startLevel >= 30}
                 onClick={() => selectStartLevel(settings.tournament.startLevel + 1)}
               >+</button>
+            </div>
+          </div>
+
+          {/* スタック差 */}
+          <div className="form-group">
+            <label className="form-label">スタック差</label>
+            <div className="variance-toggle">
+              {([['none', 'なし'], ['small', '少し'], ['large', '大きい']] as [StackVariance, string][]).map(([val, label]) => (
+                <button
+                  key={val}
+                  className={`variance-btn ${settings.stackVariance === val ? 'active' : ''}`}
+                  onClick={() => setSettings({ ...settings, stackVariance: val })}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 

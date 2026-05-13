@@ -26,9 +26,43 @@ export class GameManager {
     settings: GameSettings,
     players: Player[]
   ) {
+    const adjustedPlayers = players.map((p) => ({ ...p }));
+
+    // スタック差の適用
+    if (settings.stackVariance !== 'none' && adjustedPlayers.length >= 2) {
+      const base = settings.initialChips;
+      // small: ±10% の範囲, large: ±30% の範囲
+      const varianceRate = settings.stackVariance === 'small' ? 0.10 : 0.30;
+      const totalTarget = base * adjustedPlayers.length;
+
+      // 各プレイヤーにランダムな係数を割り当て
+      const rawChips = adjustedPlayers.map(() => {
+        const factor = 1 + (Math.random() * 2 - 1) * varianceRate;
+        return Math.round(base * factor);
+      });
+
+      // 合計が元の合計と同じになるよう調整（BBの倍数に丸める）
+      const bb = settings.bigBlind || 1;
+      const rawTotal = rawChips.reduce((s, c) => s + c, 0);
+      const scale = totalTarget / rawTotal;
+      const finalChips = rawChips.map((c) => Math.max(bb, Math.round((c * scale) / bb) * bb));
+
+      // 端数調整: 差分を最大チップの人に付与
+      const finalTotal = finalChips.reduce((s, c) => s + c, 0);
+      const diff = totalTarget - finalTotal;
+      if (diff !== 0) {
+        const maxIdx = finalChips.indexOf(Math.max(...finalChips));
+        finalChips[maxIdx] += diff;
+      }
+
+      adjustedPlayers.forEach((p, i) => {
+        p.chips = finalChips[i];
+      });
+    }
+
     this.gameState = {
       phase: 'waiting',
-      players: players.map((p) => ({ ...p })),
+      players: adjustedPlayers,
       dealerIndex: -1, // startNewHandで0に設定される
       currentPlayerIndex: 0,
       pot: { main: 0, sidePots: [], total: 0 },
@@ -89,8 +123,19 @@ export class GameManager {
     this.actedInRound.clear();
     this.lastRaiserId = null;
 
-    // ディーラーボタンを次のアクティブプレイヤーに移動
-    state.dealerIndex = this.findNextActivePlayer(state.dealerIndex);
+    // ディーラーボタンを決定
+    if (state.handNumber === 1) {
+      // 初回ハンド: ランダムにディーラーを選択
+      const activeIndices: number[] = [];
+      state.players.forEach((p, i) => {
+        if (p.status !== 'busted') activeIndices.push(i);
+      });
+      const randomIdx = Math.floor(Math.random() * activeIndices.length);
+      state.dealerIndex = activeIndices[randomIdx];
+    } else {
+      // 2回目以降: 次のアクティブプレイヤーに移動
+      state.dealerIndex = this.findNextActivePlayer(state.dealerIndex);
+    }
 
     // SB, BBの設定
     const activePlayers = this.getActivePlayers();
