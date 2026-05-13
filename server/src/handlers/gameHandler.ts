@@ -332,6 +332,19 @@ export function registerGameHandlers(
       }
     });
 
+    // トーナメント: レベルアップチェック
+    if (room.gameManager.isTournament()) {
+      const levelUp = room.gameManager.checkTournamentLevelUp();
+      if (levelUp) {
+        io.to(roomCode).emit('tournament:levelUp', {
+          level: levelUp.newLevel,
+          nextLevel: levelUp.nextLevel,
+          tournament: room.gameManager.getTournamentState()!,
+        });
+        console.log(`[Tournament] ルーム ${roomCode}: レベルアップ → Lv.${levelUp.newLevel.level} (${levelUp.newLevel.sb}/${levelUp.newLevel.bb})`);
+      }
+    }
+
     const newState = room.gameManager.startNewHand();
 
     console.log(`[Game] ルーム ${roomCode}: ハンド${newState.handNumber} 開始`);
@@ -415,6 +428,56 @@ export function registerGameHandlers(
     room.isPaused = false;
     io.to(roomCode).emit('game:resumed');
     console.log(`[Game] ルーム ${roomCode}: 再開`);
+  });
+
+  // トーナメント: 一時停止
+  socket.on('tournament:pause', ({ roomCode }) => {
+    const info = getPlayerIdFromSocket(socket.id);
+    if (!info || !isHost(roomCode, info.playerId)) return;
+
+    const room = getRooms().get(roomCode);
+    if (!room?.gameManager?.isTournament()) return;
+
+    const t = room.gameManager.pauseTournament();
+    if (t) {
+      io.to(roomCode).emit('tournament:paused', { tournament: t });
+      console.log(`[Tournament] ルーム ${roomCode}: 一時停止`);
+    }
+  });
+
+  // トーナメント: 再開
+  socket.on('tournament:resume', ({ roomCode }) => {
+    const info = getPlayerIdFromSocket(socket.id);
+    if (!info || !isHost(roomCode, info.playerId)) return;
+
+    const room = getRooms().get(roomCode);
+    if (!room?.gameManager?.isTournament()) return;
+
+    const t = room.gameManager.resumeTournament();
+    if (t) {
+      io.to(roomCode).emit('tournament:resumed', { tournament: t });
+      console.log(`[Tournament] ルーム ${roomCode}: 再開`);
+    }
+  });
+
+  // トーナメント: レベルスキップ
+  socket.on('tournament:skipLevel', ({ roomCode }) => {
+    const info = getPlayerIdFromSocket(socket.id);
+    if (!info || !isHost(roomCode, info.playerId)) return;
+
+    const room = getRooms().get(roomCode);
+    if (!room?.gameManager?.isTournament()) return;
+
+    const levelUp = room.gameManager.advanceTournamentLevel();
+    if (levelUp) {
+      io.to(roomCode).emit('tournament:levelUp', {
+        level: levelUp.newLevel,
+        nextLevel: levelUp.nextLevel,
+        tournament: room.gameManager.getTournamentState()!,
+      });
+      io.to(roomCode).emit('game:stateUpdate', { gameState: room.gameManager.getState() });
+      console.log(`[Tournament] ルーム ${roomCode}: レベルスキップ → Lv.${levelUp.newLevel.level}`);
+    }
   });
 
   // ゲーム終了

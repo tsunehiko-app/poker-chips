@@ -9,6 +9,9 @@ import {
   AvailableActions,
   HandResult,
   FinalResult,
+  TournamentState,
+  BlindLevel,
+  BLIND_STRUCTURE,
 } from '../../../shared/types';
 import { calculatePots, distributePots } from './PotCalculator';
 
@@ -33,6 +36,30 @@ export class GameManager {
       handNumber: 0,
       settings: { ...settings },
     };
+
+    // トーナメントモードの初期化
+    if (settings.tournament.enabled) {
+      const startIdx = this.findStructureIndex(settings.tournament.startLevel);
+      const level = BLIND_STRUCTURE[startIdx];
+      this.gameState.settings.smallBlind = level.sb;
+      this.gameState.settings.bigBlind = level.bb;
+      this.gameState.settings.ante = level.ante;
+      this.gameState.tournament = {
+        currentLevel: level.level,
+        structureIndex: startIdx,
+        levelStartTime: Date.now(),
+        isPaused: false,
+        pausedTimeRemaining: 0,
+      };
+    }
+  }
+
+  /**
+   * BLIND_STRUCTUREの中からレベル番号に対応するインデックスを探す
+   */
+  private findStructureIndex(level: number): number {
+    const idx = BLIND_STRUCTURE.findIndex((l) => l.level === level && !l.isBreak);
+    return idx >= 0 ? idx : 0;
   }
 
   getState(): GameState {
@@ -632,5 +659,126 @@ export class GameManager {
       (p) => p.status !== 'folded' && p.status !== 'busted'
     );
     return active.length <= 1 && nonFolded.length > 1;
+  }
+
+  // =============================================
+  // トーナメント機能
+  // =============================================
+
+  /**
+   * トーナメントモードかチェック
+   */
+  isTournament(): boolean {
+    return this.gameState.settings.tournament.enabled && !!this.gameState.tournament;
+  }
+
+  /**
+   * トーナメントのレベルアップが必要かチェック
+   * @returns レベルアップした場合は新しいBlindLevelを返す
+   */
+  checkTournamentLevelUp(): { newLevel: BlindLevel; nextLevel?: BlindLevel } | null {
+    const t = this.gameState.tournament;
+    if (!t || t.isPaused) return null;
+
+    const durationMs = this.gameState.settings.tournament.levelDurationMin * 60 * 1000;
+    const elapsed = Date.now() - t.levelStartTime;
+
+    if (elapsed < durationMs) return null;
+
+    // 次のレベルに進む
+    return this.advanceTournamentLevel();
+  }
+
+  /**
+   * トーナメントのレベルを1つ進める
+   */
+  advanceTournamentLevel(): { newLevel: BlindLevel; nextLevel?: BlindLevel } | null {
+    const t = this.gameState.tournament;
+    if (!t) return null;
+
+    let nextIdx = t.structureIndex + 1;
+
+    // ブレイクをスキップ
+    while (nextIdx < BLIND_STRUCTURE.length && BLIND_STRUCTURE[nextIdx].isBreak) {
+      nextIdx++;
+    }
+
+    if (nextIdx >= BLIND_STRUCTURE.length) return null; // 最終レベル
+
+    const newLevel = BLIND_STRUCTURE[nextIdx];
+    t.structureIndex = nextIdx;
+    t.currentLevel = newLevel.level;
+    t.levelStartTime = Date.now();
+
+    // ゲーム設定に反映
+    this.gameState.settings.smallBlind = newLevel.sb;
+    this.gameState.settings.bigBlind = newLevel.bb;
+    this.gameState.settings.ante = newLevel.ante;
+
+    // 次のレベルを取得
+    let nextNextIdx = nextIdx + 1;
+    while (nextNextIdx < BLIND_STRUCTURE.length && BLIND_STRUCTURE[nextNextIdx].isBreak) {
+      nextNextIdx++;
+    }
+    const nextLevel = nextNextIdx < BLIND_STRUCTURE.length ? BLIND_STRUCTURE[nextNextIdx] : undefined;
+
+    return { newLevel, nextLevel };
+  }
+
+  /**
+   * トーナメントを一時停止
+   */
+  pauseTournament(): TournamentState | null {
+    const t = this.gameState.tournament;
+    if (!t || t.isPaused) return null;
+
+    const durationMs = this.gameState.settings.tournament.levelDurationMin * 60 * 1000;
+    t.pausedTimeRemaining = Math.max(0, durationMs - (Date.now() - t.levelStartTime));
+    t.isPaused = true;
+
+    return { ...t };
+  }
+
+  /**
+   * トーナメントを再開
+   */
+  resumeTournament(): TournamentState | null {
+    const t = this.gameState.tournament;
+    if (!t || !t.isPaused) return null;
+
+    t.levelStartTime = Date.now() - (this.gameState.settings.tournament.levelDurationMin * 60 * 1000 - t.pausedTimeRemaining);
+    t.isPaused = false;
+    t.pausedTimeRemaining = 0;
+
+    return { ...t };
+  }
+
+  /**
+   * 現在のトーナメント状態を取得
+   */
+  getTournamentState(): TournamentState | undefined {
+    return this.gameState.tournament ? { ...this.gameState.tournament } : undefined;
+  }
+
+  /**
+   * 現在のレベルのBlindLevel情報を取得
+   */
+  getCurrentBlindLevel(): BlindLevel | null {
+    const t = this.gameState.tournament;
+    if (!t) return null;
+    return BLIND_STRUCTURE[t.structureIndex] || null;
+  }
+
+  /**
+   * 次のレベルのBlindLevel情報を取得
+   */
+  getNextBlindLevel(): BlindLevel | null {
+    const t = this.gameState.tournament;
+    if (!t) return null;
+    let nextIdx = t.structureIndex + 1;
+    while (nextIdx < BLIND_STRUCTURE.length && BLIND_STRUCTURE[nextIdx].isBreak) {
+      nextIdx++;
+    }
+    return nextIdx < BLIND_STRUCTURE.length ? BLIND_STRUCTURE[nextIdx] : null;
   }
 }

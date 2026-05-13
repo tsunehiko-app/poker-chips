@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import HostGame from './HostGame';
 import PlayerGame from './PlayerGame';
-import type { GameState, AvailableActions, HandResult, FinalResult, PlayerAction, GamePhase, PotState } from '../../../shared/types';
+import TournamentBar from '../components/TournamentBar';
+import type { GameState, AvailableActions, HandResult, FinalResult, PlayerAction, GamePhase, PotState, TournamentState, BlindLevel } from '../../../shared/types';
 
 export interface Toast {
   id: number;
@@ -123,6 +124,20 @@ function Game() {
       addToast('ゲームが再開されました', 'info');
     };
 
+    const onTournamentLevelUp = (data: { level: BlindLevel; nextLevel?: BlindLevel; tournament: TournamentState }) => {
+      setGameState((prev) => prev ? { ...prev, tournament: data.tournament } : prev);
+      showPhaseTransition(`Lv.${data.level.level} — ${data.level.sb.toLocaleString()}/${data.level.bb.toLocaleString()}`);
+      addToast(`ブラインドアップ: ${data.level.sb.toLocaleString()}/${data.level.bb.toLocaleString()}`, 'warning');
+    };
+
+    const onTournamentPaused = (data: { tournament: TournamentState }) => {
+      setGameState((prev) => prev ? { ...prev, tournament: data.tournament } : prev);
+    };
+
+    const onTournamentResumed = (data: { tournament: TournamentState }) => {
+      setGameState((prev) => prev ? { ...prev, tournament: data.tournament } : prev);
+    };
+
     const onEnded = (data: { results: FinalResult[] }) => {
       navigate(`/results/${roomCode}`, { state: { results: data.results } });
     };
@@ -144,6 +159,9 @@ function Game() {
     socket.on('game:resumed', onResumed);
     socket.on('game:ended', onEnded);
     socket.on('error', onError);
+    socket.on('tournament:levelUp', onTournamentLevelUp);
+    socket.on('tournament:paused', onTournamentPaused);
+    socket.on('tournament:resumed', onTournamentResumed);
 
     return () => {
       socket.off('game:started', onGameStarted);
@@ -159,6 +177,9 @@ function Game() {
       socket.off('game:resumed', onResumed);
       socket.off('game:ended', onEnded);
       socket.off('error', onError);
+      socket.off('tournament:levelUp', onTournamentLevelUp);
+      socket.off('tournament:paused', onTournamentPaused);
+      socket.off('tournament:resumed', onTournamentResumed);
     };
   }, [roomCode, playerId, navigate]);
 
@@ -208,6 +229,13 @@ function Game() {
           </div>
         ))}
       </div>
+
+      {gameState.tournament && (
+        <TournamentBar
+          tournament={gameState.tournament}
+          levelDurationMin={gameState.settings.tournament.levelDurationMin}
+        />
+      )}
 
       {isHost ? (
         <HostGame

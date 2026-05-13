@@ -245,6 +245,22 @@ function Lobby() {
                 <span className="setting-value">{settings.ante}</span>
               </div>
             )}
+            {settings.tournament?.enabled && (
+              <>
+                <div className="setting-row">
+                  <span className="setting-label">モード</span>
+                  <span className="setting-value">トーナメント</span>
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">レベル時間</span>
+                  <span className="setting-value">{settings.tournament.levelDurationMin}分</span>
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">開始レベル</span>
+                  <span className="setting-value">Lv.{settings.tournament.startLevel}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

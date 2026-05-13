@@ -132,6 +132,19 @@ function HostGame({ gameState, handResult, roomCode, playerId, availableActions 
     setShowEndConfirm(false);
   };
 
+  // トーナメント操作
+  const handleTournamentPause = () => {
+    socket.emit('tournament:pause', { roomCode });
+  };
+
+  const handleTournamentResume = () => {
+    socket.emit('tournament:resume', { roomCode });
+  };
+
+  const handleTournamentSkip = () => {
+    socket.emit('tournament:skipLevel', { roomCode });
+  };
+
   const handleSelectWinners = (winnerIds: string[]) => {
     socket.emit('game:selectWinner', { roomCode, winnerIds });
   };
@@ -166,9 +179,21 @@ function HostGame({ gameState, handResult, roomCode, playerId, availableActions 
           <span className="phase-badge">{phaseLabels[gameState.phase]}</span>
         </div>
         <div className="host-controls-mini">
-          <button className="btn btn-small btn-ghost" onClick={handlePause}>
-            &#9646;&#9646;
-          </button>
+          {gameState.tournament && (
+            <>
+              {gameState.tournament.isPaused ? (
+                <button className="btn btn-small btn-ghost" onClick={handleTournamentResume}>&#9654;</button>
+              ) : (
+                <button className="btn btn-small btn-ghost" onClick={handleTournamentPause}>&#9646;&#9646;</button>
+              )}
+              <button className="btn btn-small btn-ghost" onClick={handleTournamentSkip}>&#9654;&#9654;</button>
+            </>
+          )}
+          {!gameState.tournament && (
+            <button className="btn btn-small btn-ghost" onClick={handlePause}>
+              &#9646;&#9646;
+            </button>
+          )}
           <button
             className="btn btn-small btn-ghost btn-danger-text"
             onClick={() => setShowEndConfirm(true)}
