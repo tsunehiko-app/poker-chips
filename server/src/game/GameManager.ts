@@ -441,6 +441,8 @@ export class GameManager {
 
   /**
    * 勝者を選択してポットを分配する
+   * サイドポット対応: totalBetベースでポット構造を再計算し、
+   * 各ポットの対象者のみに分配する
    */
   selectWinners(winnerIds: string[]): HandResult {
     const state = this.gameState;
@@ -448,29 +450,82 @@ export class GameManager {
     // まだ未回収のベットがあれば集める
     this.collectBets();
 
-    // 蓄積された全ポットを勝者に分配
-    const totalPot = this.accumulatedPot;
     const validWinners = winnerIds.filter((id) => {
       const p = state.players.find((pl) => pl.id === id);
       return p && p.status !== 'folded' && p.status !== 'busted';
     });
 
+    // totalBetを使ってサイドポット構造を再計算
+    const bettingPlayers = state.players
+      .filter((p) => p.totalBet > 0)
+      .sort((a, b) => a.totalBet - b.totalBet);
+
+    const pots: { amount: number; eligiblePlayerIds: string[] }[] = [];
+    let processedAmount = 0;
+
+    const uniqueBets = [...new Set(bettingPlayers.map((p) => p.totalBet))].sort(
+      (a, b) => a - b
+    );
+
+    for (const betLevel of uniqueBets) {
+      const contribution = betLevel - processedAmount;
+      if (contribution <= 0) continue;
+
+      // このレベルに貢献したプレイヤー（totalBetがこのレベル以上）
+      const contributors = bettingPlayers.filter((p) => p.totalBet >= betLevel);
+      const potAmount = contribution * contributors.length;
+
+      // fold/busted以外のプレイヤーのみが獲得対象
+      const eligibleForWin = contributors
+        .filter((p) => p.status !== 'folded' && p.status !== 'busted')
+        .map((p) => p.id);
+
+      pots.push({ amount: potAmount, eligiblePlayerIds: eligibleForWin });
+      processedAmount = betLevel;
+    }
+
+    // 各ポットを分配
     const playerWinnings = new Map<string, number>();
     const distributions: { potIndex: number; amount: number; winnerIds: string[] }[] = [];
 
-    if (validWinners.length > 0 && totalPot > 0) {
-      const share = Math.floor(totalPot / validWinners.length);
-      const remainder = totalPot - share * validWinners.length;
-      validWinners.forEach((id, idx) => {
-        const amt = share + (idx === 0 ? remainder : 0);
-        playerWinnings.set(id, amt);
-      });
-      distributions.push({
-        potIndex: 0,
-        amount: totalPot,
-        winnerIds: validWinners,
-      });
-    }
+    pots.forEach((pot, index) => {
+      if (pot.amount <= 0) return;
+
+      // このポットの対象者のうち、選択された勝者
+      const potWinners = validWinners.filter((id) =>
+        pot.eligiblePlayerIds.includes(id)
+      );
+
+      if (potWinners.length > 0) {
+        const share = Math.floor(pot.amount / potWinners.length);
+        const remainder = pot.amount - share * potWinners.length;
+        potWinners.forEach((id, idx) => {
+          const amt = share + (idx === 0 ? remainder : 0);
+          playerWinnings.set(id, (playerWinnings.get(id) || 0) + amt);
+        });
+        distributions.push({
+          potIndex: index,
+          amount: pot.amount,
+          winnerIds: potWinners,
+        });
+      } else {
+        // 選択された勝者がこのポットの対象外 → 対象者全員に返却
+        const fallback = pot.eligiblePlayerIds;
+        if (fallback.length > 0) {
+          const share = Math.floor(pot.amount / fallback.length);
+          const remainder = pot.amount - share * fallback.length;
+          fallback.forEach((id, idx) => {
+            const amt = share + (idx === 0 ? remainder : 0);
+            playerWinnings.set(id, (playerWinnings.get(id) || 0) + amt);
+          });
+          distributions.push({
+            potIndex: index,
+            amount: pot.amount,
+            winnerIds: fallback,
+          });
+        }
+      }
+    });
 
     // チップを勝者に付与（amountは純利益 = 獲得額 - 自分のベット額）
     const winners: HandResult['winners'] = [];
@@ -482,6 +537,19 @@ export class GameManager {
         winners.push({
           playerId: player.id,
           playerName: player.name,
+          amount: netProfit,
+        });
+      }
+    });
+
+    // 勝者に選ばれなかったがチップを返却されたプレイヤーも結果に含める
+    state.players.forEach((p) => {
+      if (playerWinnings.has(p.id) && !validWinners.includes(p.id)) {
+        const grossAmount = playerWinnings.get(p.id)!;
+        const netProfit = grossAmount - p.totalBet;
+        winners.push({
+          playerId: p.id,
+          playerName: p.name,
           amount: netProfit,
         });
       }
