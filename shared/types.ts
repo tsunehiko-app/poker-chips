@@ -182,6 +182,15 @@ export interface HandResult {
   bustedPlayers: { playerId: string; playerName: string }[];
 }
 
+// --- ショーダウン用ポット情報 ---
+
+export interface ShowdownPot {
+  potIndex: number;
+  label: string;          // "メインポット" or "サイドポット1" etc.
+  amount: number;
+  eligiblePlayerIds: string[];
+}
+
 // --- 最終結果 ---
 
 export interface FinalResult {
@@ -207,7 +216,7 @@ export interface ClientToServerEvents {
   'game:start': (data: { roomCode: string; seatOrder?: string[] }) => void;
   'game:action': (data: { roomCode: string; action: PlayerAction; amount?: number }) => void;
   'game:nextRound': (data: { roomCode: string }) => void;
-  'game:selectWinner': (data: { roomCode: string; winnerIds: string[] }) => void;
+  'game:selectWinner': (data: { roomCode: string; winnerIds: string[]; potWinners?: { potIndex: number; winnerIds: string[] }[] }) => void;
   'game:nextHand': (data: { roomCode: string }) => void;
   'game:rebuy': (data: { roomCode: string }) => void;
   'game:pause': (data: { roomCode: string }) => void;
@@ -229,7 +238,7 @@ export interface ServerToClientEvents {
   'game:yourTurn': (data: { availableActions: AvailableActions }) => void;
   'game:actionResult': (data: { playerId: string; playerName: string; action: PlayerAction; amount: number }) => void;
   'game:roundEnd': (data: { phase: GamePhase; pot: PotState }) => void;
-  'game:showdown': (data: { gameState: GameState }) => void;
+  'game:showdown': (data: { gameState: GameState; showdownPots?: ShowdownPot[] }) => void;
   'game:handResult': (data: { result: HandResult; gameState: GameState }) => void;
   'game:playerBusted': (data: { playerId: string; playerName: string }) => void;
   'game:playerRebuyed': (data: { playerId: string; playerName: string; rebuyCount: number; chips: number }) => void;

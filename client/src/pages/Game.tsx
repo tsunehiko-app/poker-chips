@@ -5,7 +5,7 @@ import HostGame from './HostGame';
 import PlayerGame from './PlayerGame';
 import TournamentBar from '../components/TournamentBar';
 import DealerAnimation from '../components/DealerAnimation';
-import type { GameState, AvailableActions, HandResult, FinalResult, PlayerAction, GamePhase, PotState, TournamentState, BlindLevel } from '../../../shared/types';
+import type { GameState, AvailableActions, HandResult, FinalResult, PlayerAction, GamePhase, PotState, TournamentState, BlindLevel, ShowdownPot } from '../../../shared/types';
 
 export interface Toast {
   id: number;
@@ -26,6 +26,7 @@ function Game() {
   const [phaseTransition, setPhaseTransition] = useState<string | null>(null);
   const [showDealerAnim, setShowDealerAnim] = useState(false);
   const [dealerAnimDone, setDealerAnimDone] = useState(false);
+  const [showdownPots, setShowdownPots] = useState<ShowdownPot[] | null>(null);
 
   const playerId = sessionStorage.getItem('playerId');
   const isHost = sessionStorage.getItem('isHost') === 'true';
@@ -102,9 +103,10 @@ function Game() {
       showPhaseTransition(data.phase);
     };
 
-    const onShowdown = (data: { gameState: GameState }) => {
+    const onShowdown = (data: { gameState: GameState; showdownPots?: ShowdownPot[] }) => {
       setGameState(data.gameState);
       setAvailableActions(null);
+      setShowdownPots(data.showdownPots || null);
       showPhaseTransition('showdown');
     };
 
@@ -112,6 +114,7 @@ function Game() {
       setHandResult(data.result);
       setGameState(data.gameState);
       setAvailableActions(null);
+      setShowdownPots(null);
       data.result.winners.forEach((w) => {
         const sign = w.amount >= 0 ? '+' : '';
         addToast(`${w.playerName} ${sign}${w.amount} チップ`, 'success');
@@ -267,6 +270,7 @@ function Game() {
           roomCode={roomCode!}
           playerId={playerId!}
           availableActions={availableActions}
+          showdownPots={showdownPots}
         />
       ) : (
         <PlayerGame

@@ -4,7 +4,7 @@ import PotDisplay from '../components/PotDisplay';
 import ActionButtons from '../components/ActionButtons';
 import RaiseSlider from '../components/RaiseSlider';
 import WinnerSelector from '../components/WinnerSelector';
-import type { GameState, HandResult, Player, AvailableActions, PlayerAction } from '../../../shared/types';
+import type { GameState, HandResult, Player, AvailableActions, PlayerAction, ShowdownPot } from '../../../shared/types';
 
 interface HostGameProps {
   gameState: GameState;
@@ -12,9 +12,10 @@ interface HostGameProps {
   roomCode: string;
   playerId: string;
   availableActions: AvailableActions | null;
+  showdownPots: ShowdownPot[] | null;
 }
 
-function HostGame({ gameState, handResult, roomCode, playerId, availableActions }: HostGameProps) {
+function HostGame({ gameState, handResult, roomCode, playerId, availableActions, showdownPots }: HostGameProps) {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showRaiseSlider, setShowRaiseSlider] = useState(false);
 
@@ -145,8 +146,8 @@ function HostGame({ gameState, handResult, roomCode, playerId, availableActions 
     socket.emit('tournament:skipLevel', { roomCode });
   };
 
-  const handleSelectWinners = (winnerIds: string[]) => {
-    socket.emit('game:selectWinner', { roomCode, winnerIds });
+  const handleSelectWinners = (winnerIds: string[], potWinners?: { potIndex: number; winnerIds: string[] }[]) => {
+    socket.emit('game:selectWinner', { roomCode, winnerIds, potWinners });
   };
 
   const getStatusClass = (player: Player) => {
@@ -237,6 +238,7 @@ function HostGame({ gameState, handResult, roomCode, playerId, availableActions 
       {isShowdown && !handResult && (
         <WinnerSelector
           players={activePlayers}
+          showdownPots={showdownPots}
           onSelectWinners={handleSelectWinners}
         />
       )}

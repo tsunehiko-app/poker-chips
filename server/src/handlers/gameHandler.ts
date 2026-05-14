@@ -171,7 +171,8 @@ export function registerGameHandlers(
           }
 
           const showdownState = gm.getState();
-          io.to(roomCode).emit('game:showdown', { gameState: showdownState });
+          const showdownPots = gm.calculateShowdownPots();
+          io.to(roomCode).emit('game:showdown', { gameState: showdownState, showdownPots });
           io.to(roomCode).emit('game:stateUpdate', { gameState: showdownState });
           console.log(
             `[Game] ルーム ${roomCode}: オールインランアウト → ショーダウン`
@@ -183,7 +184,8 @@ export function registerGameHandlers(
         const advancedState = gm.advancePhase();
 
         if (advancedState.phase === 'showdown') {
-          io.to(roomCode).emit('game:showdown', { gameState: advancedState });
+          const showdownPots2 = gm.calculateShowdownPots();
+          io.to(roomCode).emit('game:showdown', { gameState: advancedState, showdownPots: showdownPots2 });
           io.to(roomCode).emit('game:stateUpdate', { gameState: advancedState });
           console.log(`[Game] ルーム ${roomCode}: ショーダウン`);
         } else {
@@ -235,7 +237,8 @@ export function registerGameHandlers(
       const gameState = room.gameManager.advancePhase();
 
       if (gameState.phase === 'showdown') {
-        io.to(roomCode).emit('game:showdown', { gameState });
+        const showdownPots3 = room.gameManager.calculateShowdownPots();
+        io.to(roomCode).emit('game:showdown', { gameState, showdownPots: showdownPots3 });
       } else {
         io.to(roomCode).emit('game:roundEnd', {
           phase: gameState.phase,
@@ -251,7 +254,7 @@ export function registerGameHandlers(
   });
 
   // 勝者選択（ホストのみ）
-  socket.on('game:selectWinner', ({ roomCode, winnerIds }) => {
+  socket.on('game:selectWinner', ({ roomCode, winnerIds, potWinners }) => {
     const info = getPlayerIdFromSocket(socket.id);
     if (!info || info.roomCode !== roomCode) {
       socket.emit('error', { message: '不正なリクエストです' });
@@ -270,7 +273,7 @@ export function registerGameHandlers(
     }
 
     try {
-      const handResult = room.gameManager.selectWinners(winnerIds);
+      const handResult = room.gameManager.selectWinners(winnerIds, potWinners);
       const gameState = room.gameManager.getState();
 
       io.to(roomCode).emit('game:handResult', {

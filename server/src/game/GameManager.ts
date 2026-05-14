@@ -11,6 +11,7 @@ import {
   FinalResult,
   TournamentState,
   BlindLevel,
+  ShowdownPot,
   BLIND_STRUCTURE,
 } from '../../../shared/types';
 import { calculatePots, distributePots } from './PotCalculator';
@@ -440,20 +441,77 @@ export class GameManager {
   }
 
   /**
-   * 勝者を選択してポットを分配する
-   * サイドポット対応: totalBetベースでポット構造を再計算し、
-   * 各ポットの対象者のみに分配する
+   * totalBetベースでサイドポット構造を計算する（ショーダウン用）
    */
-  selectWinners(winnerIds: string[]): HandResult {
+  calculateShowdownPots(): ShowdownPot[] {
+    const state = this.gameState;
+
+    // まだ未回収のベットがあれば先に集める（状態を変えずにシミュレート）
+    const bettingPlayers = state.players
+      .filter((p) => p.totalBet > 0 || p.currentBet > 0)
+      .map((p) => ({
+        ...p,
+        totalInvested: p.totalBet + p.currentBet,
+      }))
+      .sort((a, b) => a.totalInvested - b.totalInvested);
+
+    if (bettingPlayers.length === 0) return [];
+
+    const pots: ShowdownPot[] = [];
+    let processedAmount = 0;
+    const uniqueBets = [...new Set(bettingPlayers.map((p) => p.totalInvested))].sort(
+      (a, b) => a - b
+    );
+
+    let potIdx = 0;
+    for (const betLevel of uniqueBets) {
+      const contribution = betLevel - processedAmount;
+      if (contribution <= 0) continue;
+
+      const contributors = bettingPlayers.filter((p) => p.totalInvested >= betLevel);
+      const potAmount = contribution * contributors.length;
+
+      const eligibleForWin = contributors
+        .filter((p) => p.status !== 'folded' && p.status !== 'busted')
+        .map((p) => p.id);
+
+      pots.push({
+        potIndex: potIdx,
+        label: potIdx === 0 ? 'メインポット' : `サイドポット${potIdx}`,
+        amount: potAmount,
+        eligiblePlayerIds: eligibleForWin,
+      });
+      potIdx++;
+      processedAmount = betLevel;
+    }
+
+    // 対象プレイヤーが同じポットは合算
+    const merged: ShowdownPot[] = [];
+    for (const pot of pots) {
+      const last = merged[merged.length - 1];
+      if (last && JSON.stringify(last.eligiblePlayerIds) === JSON.stringify(pot.eligiblePlayerIds)) {
+        last.amount += pot.amount;
+      } else {
+        merged.push({ ...pot, potIndex: merged.length, label: merged.length === 0 ? 'メインポット' : `サイドポット${merged.length}` });
+      }
+    }
+
+    return merged;
+  }
+
+  /**
+   * 勝者を選択してポットを分配する
+   * potWinnersが指定されている場合はポットごとに分配、
+   * なければwinnerIdsで全ポットを対象に分配する
+   */
+  selectWinners(
+    winnerIds: string[],
+    potWinners?: { potIndex: number; winnerIds: string[] }[]
+  ): HandResult {
     const state = this.gameState;
 
     // まだ未回収のベットがあれば集める
     this.collectBets();
-
-    const validWinners = winnerIds.filter((id) => {
-      const p = state.players.find((pl) => pl.id === id);
-      return p && p.status !== 'folded' && p.status !== 'busted';
-    });
 
     // totalBetを使ってサイドポット構造を再計算
     const bettingPlayers = state.players
@@ -470,46 +528,66 @@ export class GameManager {
     for (const betLevel of uniqueBets) {
       const contribution = betLevel - processedAmount;
       if (contribution <= 0) continue;
-
-      // このレベルに貢献したプレイヤー（totalBetがこのレベル以上）
       const contributors = bettingPlayers.filter((p) => p.totalBet >= betLevel);
       const potAmount = contribution * contributors.length;
-
-      // fold/busted以外のプレイヤーのみが獲得対象
       const eligibleForWin = contributors
         .filter((p) => p.status !== 'folded' && p.status !== 'busted')
         .map((p) => p.id);
-
       pots.push({ amount: potAmount, eligiblePlayerIds: eligibleForWin });
       processedAmount = betLevel;
+    }
+
+    // 対象プレイヤーが同じポットは合算（ShowdownPotsと一致させる）
+    const mergedPots: { amount: number; eligiblePlayerIds: string[] }[] = [];
+    for (const pot of pots) {
+      const last = mergedPots[mergedPots.length - 1];
+      if (last && JSON.stringify(last.eligiblePlayerIds) === JSON.stringify(pot.eligiblePlayerIds)) {
+        last.amount += pot.amount;
+      } else {
+        mergedPots.push({ ...pot });
+      }
     }
 
     // 各ポットを分配
     const playerWinnings = new Map<string, number>();
     const distributions: { potIndex: number; amount: number; winnerIds: string[] }[] = [];
 
-    pots.forEach((pot, index) => {
+    mergedPots.forEach((pot, index) => {
       if (pot.amount <= 0) return;
 
-      // このポットの対象者のうち、選択された勝者
-      const potWinners = validWinners.filter((id) =>
-        pot.eligiblePlayerIds.includes(id)
-      );
+      // このポットの勝者を決定
+      let potWinnerIds: string[];
 
-      if (potWinners.length > 0) {
-        const share = Math.floor(pot.amount / potWinners.length);
-        const remainder = pot.amount - share * potWinners.length;
-        potWinners.forEach((id, idx) => {
+      if (potWinners && potWinners.length > 0) {
+        // ポットごとに勝者が指定されている場合
+        const specified = potWinners.find((pw) => pw.potIndex === index);
+        if (specified) {
+          potWinnerIds = specified.winnerIds.filter((id) =>
+            pot.eligiblePlayerIds.includes(id)
+          );
+        } else {
+          // このポットの指定がない → winnerIdsから対象者を探す
+          potWinnerIds = winnerIds.filter((id) =>
+            pot.eligiblePlayerIds.includes(id)
+          );
+        }
+      } else {
+        // 従来: winnerIdsから対象者を探す
+        potWinnerIds = winnerIds.filter((id) =>
+          pot.eligiblePlayerIds.includes(id)
+        );
+      }
+
+      if (potWinnerIds.length > 0) {
+        const share = Math.floor(pot.amount / potWinnerIds.length);
+        const remainder = pot.amount - share * potWinnerIds.length;
+        potWinnerIds.forEach((id, idx) => {
           const amt = share + (idx === 0 ? remainder : 0);
           playerWinnings.set(id, (playerWinnings.get(id) || 0) + amt);
         });
-        distributions.push({
-          potIndex: index,
-          amount: pot.amount,
-          winnerIds: potWinners,
-        });
+        distributions.push({ potIndex: index, amount: pot.amount, winnerIds: potWinnerIds });
       } else {
-        // 選択された勝者がこのポットの対象外 → 対象者全員に返却
+        // 勝者が対象外 → 対象者全員に返却
         const fallback = pot.eligiblePlayerIds;
         if (fallback.length > 0) {
           const share = Math.floor(pot.amount / fallback.length);
@@ -518,17 +596,14 @@ export class GameManager {
             const amt = share + (idx === 0 ? remainder : 0);
             playerWinnings.set(id, (playerWinnings.get(id) || 0) + amt);
           });
-          distributions.push({
-            potIndex: index,
-            amount: pot.amount,
-            winnerIds: fallback,
-          });
+          distributions.push({ potIndex: index, amount: pot.amount, winnerIds: fallback });
         }
       }
     });
 
-    // チップを勝者に付与（amountは純利益 = 獲得額 - 自分のベット額）
+    // チップを付与 & 結果を作成
     const winners: HandResult['winners'] = [];
+    const processedIds = new Set<string>();
     playerWinnings.forEach((grossAmount, playerId) => {
       const player = state.players.find((p) => p.id === playerId);
       if (player) {
@@ -539,19 +614,7 @@ export class GameManager {
           playerName: player.name,
           amount: netProfit,
         });
-      }
-    });
-
-    // 勝者に選ばれなかったがチップを返却されたプレイヤーも結果に含める
-    state.players.forEach((p) => {
-      if (playerWinnings.has(p.id) && !validWinners.includes(p.id)) {
-        const grossAmount = playerWinnings.get(p.id)!;
-        const netProfit = grossAmount - p.totalBet;
-        winners.push({
-          playerId: p.id,
-          playerName: p.name,
-          amount: netProfit,
-        });
+        processedIds.add(playerId);
       }
     });
 
