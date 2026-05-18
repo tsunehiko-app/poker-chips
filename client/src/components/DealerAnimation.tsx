@@ -56,9 +56,9 @@ function DealerAnimation({ players, dealerIndex, onComplete }: DealerAnimationPr
     <div className="dealer-anim-overlay">
       <div className="dealer-anim-container">
         <h2 className="dealer-anim-title">
-          {phase === 'spinning' && 'ディーラーを決めています...'}
-          {phase === 'landed' && `${players[dealerIndex].name} がディーラー!`}
-          {phase === 'done' && `${players[dealerIndex].name} がディーラー!`}
+          {phase === 'spinning' && 'ボタンを決めています...'}
+          {phase === 'landed' && `${players[dealerIndex].name} がボタン!`}
+          {phase === 'done' && `${players[dealerIndex].name} がボタン!`}
         </h2>
 
         <div className="dealer-anim-ring">
