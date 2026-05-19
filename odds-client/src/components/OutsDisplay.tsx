@@ -6,6 +6,9 @@ interface DrawInfo {
   description: string;
   outs: number;
   outCards: string[];
+  liveOuts?: number;
+  liveOutCards?: string[];
+  deadOutCards?: string[];
   ruleOf4: number;
   ruleOf2: number;
 }
@@ -14,8 +17,14 @@ interface OutsData {
   draws: DrawInfo[];
   totalOuts: number;
   totalOutCards: string[];
+  totalLiveOuts?: number;
+  totalLiveOutCards?: string[];
+  totalDeadOutCards?: string[];
+  hasOpponentInfo: boolean;
   ruleOf4Equity: number;
   ruleOf2Equity: number;
+  liveRuleOf4Equity?: number;
+  liveRuleOf2Equity?: number;
   street: 'preflop' | 'flop' | 'turn' | 'river';
   currentHandRank: string;
 }
@@ -48,14 +57,20 @@ function getDrawColor(name: string): string {
 export function OutsDisplay({ outs, actualWinRate }: OutsDisplayProps) {
   if (!outs || outs.draws.length === 0) return null;
 
-  const strength = getDrawStrength(outs.totalOuts);
+  const hasLiveInfo = outs.hasOpponentInfo && outs.totalLiveOuts !== undefined;
+  const displayOuts = hasLiveInfo ? outs.totalLiveOuts! : outs.totalOuts;
+  const strength = getDrawStrength(displayOuts);
   const isFlop = outs.street === 'flop';
   const isTurn = outs.street === 'turn';
-  const activeRule = isFlop ? outs.ruleOf4Equity : outs.ruleOf2Equity;
+
+  // ライブアウツがある場合はライブ版を使う
+  const activeEquity = hasLiveInfo
+    ? (isFlop ? outs.liveRuleOf4Equity! : outs.liveRuleOf2Equity!)
+    : (isFlop ? outs.ruleOf4Equity : outs.ruleOf2Equity);
   const ruleLabel = isFlop ? 'ルール・オブ・4' : 'ルール・オブ・2';
   const ruleFormula = isFlop
-    ? `${outs.totalOuts} × 4 = ${outs.ruleOf4Equity}%`
-    : `${outs.totalOuts} × 2 = ${outs.ruleOf2Equity}%`;
+    ? `${displayOuts} × 4 = ${hasLiveInfo ? outs.liveRuleOf4Equity : outs.ruleOf4Equity}%`
+    : `${displayOuts} × 2 = ${hasLiveInfo ? outs.liveRuleOf2Equity : outs.ruleOf2Equity}%`;
 
   return (
     <div className="outs-display">
@@ -65,18 +80,44 @@ export function OutsDisplay({ outs, actualWinRate }: OutsDisplayProps) {
           <h3 className="outs-title">アウツ分析</h3>
           <span className="current-hand">現在: {outs.currentHandRank || '—'}</span>
         </div>
-        <div className="outs-total" style={{ borderColor: strength.color }}>
-          <span className="outs-number" style={{ color: strength.color }}>{outs.totalOuts}</span>
-          <span className="outs-label">アウツ</span>
+        <div className="outs-total-group">
+          {hasLiveInfo ? (
+            <>
+              <div className="outs-total live" style={{ borderColor: strength.color }}>
+                <span className="outs-number" style={{ color: strength.color }}>{outs.totalLiveOuts}</span>
+                <span className="outs-label">ライブ</span>
+              </div>
+              <div className="outs-total faded">
+                <span className="outs-number faded">{outs.totalOuts}</span>
+                <span className="outs-label">全体</span>
+              </div>
+            </>
+          ) : (
+            <div className="outs-total" style={{ borderColor: strength.color }}>
+              <span className="outs-number" style={{ color: strength.color }}>{outs.totalOuts}</span>
+              <span className="outs-label">アウツ</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ライブアウツ説明 */}
+      {hasLiveInfo && outs.totalLiveOuts! < outs.totalOuts && (
+        <div className="live-outs-notice">
+          <span className="live-icon">!</span>
+          <span className="live-text">
+            相手のハンドが判明しているため、実際に勝てる<strong>ライブアウツ</strong>のみを計算しています。
+            {outs.totalOuts - outs.totalLiveOuts!}枚は改善しても相手に勝てない<span className="dead-label">デッドアウツ</span>です。
+          </span>
+        </div>
+      )}
 
       {/* 強さインジケーター */}
       <div className="strength-bar">
         <div
           className="strength-fill"
           style={{
-            width: `${Math.min((outs.totalOuts / 20) * 100, 100)}%`,
+            width: `${Math.min((displayOuts / 20) * 100, 100)}%`,
             background: strength.color,
           }}
         />
@@ -90,7 +131,10 @@ export function OutsDisplay({ outs, actualWinRate }: OutsDisplayProps) {
         <div className="rule-section">
           <div className="rule-card">
             <div className="rule-header">
-              <span className="rule-name">{ruleLabel}</span>
+              <span className="rule-name">
+                {ruleLabel}
+                {hasLiveInfo && <span className="rule-live-tag">ライブ</span>}
+              </span>
               <span className="rule-street">
                 {isFlop ? 'フロップ（残り2枚）' : 'ターン（残り1枚）'}
               </span>
@@ -99,7 +143,7 @@ export function OutsDisplay({ outs, actualWinRate }: OutsDisplayProps) {
             <div className="rule-comparison">
               <div className="rule-value">
                 <span className="rv-label">暗算（近似）</span>
-                <span className="rv-number">{activeRule}%</span>
+                <span className="rv-number">{activeEquity}%</span>
               </div>
               {actualWinRate !== undefined && (
                 <>
@@ -113,10 +157,10 @@ export function OutsDisplay({ outs, actualWinRate }: OutsDisplayProps) {
             </div>
             {actualWinRate !== undefined && (
               <div className="rule-accuracy">
-                誤差: {Math.abs(activeRule - actualWinRate).toFixed(1)}%
-                {Math.abs(activeRule - actualWinRate) <= 3
+                誤差: {Math.abs(activeEquity - actualWinRate).toFixed(1)}%
+                {Math.abs(activeEquity - actualWinRate) <= 3
                   ? ' — 暗算で十分な精度!'
-                  : Math.abs(activeRule - actualWinRate) <= 6
+                  : Math.abs(activeEquity - actualWinRate) <= 6
                   ? ' — 概ね合っています'
                   : ' — アウツが多い場合は4&2は過大評価気味'}
               </div>
@@ -125,7 +169,7 @@ export function OutsDisplay({ outs, actualWinRate }: OutsDisplayProps) {
 
           {/* 4&2の解説 */}
           <div className="rule-tip">
-            <span className="tip-icon">💡</span>
+            <span className="tip-icon">*</span>
             <span className="tip-text">
               {isFlop
                 ? 'フロップ時はアウツ数×4が大体の勝率。ライブゲーム中に暗算で判断できます。'
@@ -137,26 +181,51 @@ export function OutsDisplay({ outs, actualWinRate }: OutsDisplayProps) {
 
       {/* 各ドロー詳細 */}
       <div className="draws-list">
-        {outs.draws.map((draw, i) => (
-          <div key={i} className="draw-item">
-            <div className="draw-header">
-              <span className="draw-dot" style={{ background: getDrawColor(draw.name) }} />
-              <span className="draw-name">{draw.name}</span>
-              <span className="draw-outs-badge">{draw.outs}アウツ</span>
+        {outs.draws.map((draw, i) => {
+          const isAllDead = hasLiveInfo && draw.liveOuts === 0;
+          const hasDeadCards = hasLiveInfo && draw.deadOutCards && draw.deadOutCards.length > 0;
+          const deadCardSet = new Set(draw.deadOutCards || []);
+
+          return (
+            <div key={i} className={`draw-item ${isAllDead ? 'draw-dead' : ''}`}>
+              <div className="draw-header">
+                <span className="draw-dot" style={{ background: isAllDead ? '#555' : getDrawColor(draw.name) }} />
+                <span className="draw-name">{draw.name}</span>
+                {hasLiveInfo ? (
+                  <div className="draw-badges">
+                    {isAllDead ? (
+                      <span className="draw-outs-badge dead">0/{draw.outs} デッド</span>
+                    ) : (
+                      <>
+                        <span className="draw-outs-badge live">{draw.liveOuts}ライブ</span>
+                        {hasDeadCards && (
+                          <span className="draw-outs-badge dead-small">{draw.deadOutCards!.length}デッド</span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <span className="draw-outs-badge">{draw.outs}アウツ</span>
+                )}
+              </div>
+              <p className="draw-desc">
+                {draw.description}
+                {isAllDead && <span className="dead-reason"> — 相手の手が強いため勝てません</span>}
+              </p>
+              <div className="draw-out-cards">
+                {draw.outCards.slice(0, 12).map(card => (
+                  <div key={card} className={`mini-card ${hasLiveInfo && deadCardSet.has(card) ? 'mini-card-dead' : ''}`}>
+                    <CardDisplay card={card} size="small" />
+                    {hasLiveInfo && deadCardSet.has(card) && <div className="dead-x">×</div>}
+                  </div>
+                ))}
+                {draw.outCards.length > 12 && (
+                  <span className="more-cards">+{draw.outCards.length - 12}</span>
+                )}
+              </div>
             </div>
-            <p className="draw-desc">{draw.description}</p>
-            <div className="draw-out-cards">
-              {draw.outCards.slice(0, 12).map(card => (
-                <div key={card} className="mini-card">
-                  <CardDisplay card={card} size="small" />
-                </div>
-              ))}
-              {draw.outCards.length > 12 && (
-                <span className="more-cards">+{draw.outCards.length - 12}</span>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* アウツ早見表 */}

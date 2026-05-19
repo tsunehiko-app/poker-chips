@@ -49,7 +49,11 @@ app.post('/api/odds/calculate', (req, res) => {
       simulations: simCount,
     });
 
-    const outsAnalysis = analyzeOuts(myHand, board || []);
+    // アウツ分析（相手ハンド情報を渡してライブアウツ計算）
+    const opponentHands = opponents
+      .filter(op => op.hand && op.hand.length === 2)
+      .map(op => op.hand!);
+    const outsAnalysis = analyzeOuts(myHand, board || [], opponentHands);
 
     res.json({ ...result, outs: outsAnalysis });
   } catch (err: any) {

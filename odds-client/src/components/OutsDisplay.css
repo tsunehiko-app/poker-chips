@@ -30,6 +30,12 @@
   color: var(--text-secondary);
 }
 
+.outs-total-group {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
 .outs-total {
   display: flex;
   flex-direction: column;
@@ -38,6 +44,17 @@
   border: 2px solid;
   border-radius: 10px;
   background: rgba(0,0,0,0.2);
+}
+
+.outs-total.faded {
+  border-color: rgba(255,255,255,0.15);
+  padding: 6px 10px;
+}
+
+.outs-total.faded .outs-number {
+  font-size: 18px;
+  color: var(--text-muted);
+  text-decoration: line-through;
 }
 
 .outs-number {
@@ -51,6 +68,43 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+/* ライブアウツ通知 */
+.live-outs-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid #e74c3c;
+  margin-bottom: 12px;
+}
+
+.live-icon {
+  font-size: 14px;
+  font-weight: 800;
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.2);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.live-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.dead-label {
+  color: #e74c3c;
+  font-weight: 600;
 }
 
 /* 強さバー */
@@ -101,6 +155,20 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--accent-gold);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rule-live-tag {
+  font-size: 9px;
+  font-weight: 700;
+  color: #2ecc71;
+  background: rgba(46, 204, 113, 0.15);
+  padding: 1px 6px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .rule-street {
@@ -221,6 +289,12 @@
   color: var(--text-primary);
 }
 
+.draw-badges {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
 .draw-outs-badge {
   margin-left: auto;
   font-size: 11px;
@@ -229,6 +303,35 @@
   background: rgba(243, 156, 18, 0.15);
   padding: 2px 8px;
   border-radius: 10px;
+}
+
+.draw-outs-badge.live {
+  color: #2ecc71;
+  background: rgba(46, 204, 113, 0.15);
+  margin-left: 0;
+}
+
+.draw-outs-badge.dead {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.15);
+  margin-left: 0;
+}
+
+.draw-outs-badge.dead-small {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+  margin-left: 0;
+  font-size: 10px;
+}
+
+/* デッド状態のドロー */
+.draw-item.draw-dead {
+  opacity: 0.5;
+}
+
+.dead-reason {
+  color: #e74c3c;
+  font-weight: 600;
 }
 
 .draw-desc {
@@ -252,6 +355,23 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  position: relative;
+}
+
+.mini-card-dead {
+  opacity: 0.35;
+}
+
+.dead-x {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: 900;
+  color: #e74c3c;
+  text-shadow: 0 0 2px rgba(0,0,0,0.5);
+  pointer-events: none;
 }
 
 .more-cards {

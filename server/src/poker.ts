@@ -351,6 +351,9 @@ export interface DrawInfo {
   description: string;    // 説明
   outs: number;           // アウツ数
   outCards: string[];     // 具体的なアウツカード
+  liveOuts?: number;      // ライブアウツ数（相手に実際に勝てるアウツ）
+  liveOutCards?: string[];// ライブアウツカード
+  deadOutCards?: string[];// デッドアウツカード（改善するが勝てない）
   ruleOf4: number;        // ルール・オブ・4（フロップ時: outs×4）
   ruleOf2: number;        // ルール・オブ・2（ターン時: outs×2）
 }
@@ -359,13 +362,23 @@ export interface OutsAnalysis {
   draws: DrawInfo[];
   totalOuts: number;        // 重複除去後の合計アウツ
   totalOutCards: string[];  // 重複除去後のアウツカード
+  totalLiveOuts?: number;       // ライブアウツ合計
+  totalLiveOutCards?: string[]; // ライブアウツカード合計
+  totalDeadOutCards?: string[]; // デッドアウツカード合計
+  hasOpponentInfo: boolean;     // 相手ハンド情報があるか
   ruleOf4Equity: number;    // フロップ時の近似勝率
   ruleOf2Equity: number;    // ターン時の近似勝率
+  liveRuleOf4Equity?: number;   // ライブアウツ版ルール・オブ・4
+  liveRuleOf2Equity?: number;   // ライブアウツ版ルール・オブ・2
   street: 'preflop' | 'flop' | 'turn' | 'river';
   currentHandRank: string;  // 現在のハンドランク（ボードがある場合）
 }
 
-export function analyzeOuts(myHandStr: string[], boardStr: string[]): OutsAnalysis {
+export function analyzeOuts(
+  myHandStr: string[],
+  boardStr: string[],
+  opponentHands?: string[][] // 相手のハンド（指定されている相手のみ）
+): OutsAnalysis {
   const myHand = myHandStr.map(parseCard);
   const board = boardStr.map(parseCard);
   const allCards = [...myHand, ...board];
@@ -414,15 +427,116 @@ export function analyzeOuts(myHandStr: string[], boardStr: string[]): OutsAnalys
   const ruleOf4Equity = Math.min(totalOuts * 4, 100);
   const ruleOf2Equity = Math.min(totalOuts * 2, 100);
 
+  // ===== ライブアウツ計算（相手ハンドが指定されている場合）=====
+  const knownOpponents = opponentHands?.filter(h => h && h.length === 2 && h.every(c => c !== ''));
+  const hasOpponentInfo = !!knownOpponents && knownOpponents.length > 0;
+
+  let totalLiveOuts: number | undefined;
+  let totalLiveOutCards: string[] | undefined;
+  let totalDeadOutCards: string[] | undefined;
+  let liveRuleOf4Equity: number | undefined;
+  let liveRuleOf2Equity: number | undefined;
+
+  if (hasOpponentInfo && totalOuts > 0) {
+    const opHands = knownOpponents!.map(h => h.map(parseCard));
+    const allLiveOutCards = new Set<string>();
+    const allDeadOutCards = new Set<string>();
+
+    // 各ドローのアウツをライブ/デッドに分類
+    for (const draw of draws) {
+      const liveCards: string[] = [];
+      const deadCards: string[] = [];
+
+      for (const outCardStr of draw.outCards) {
+        const outCard = parseCard(outCardStr);
+        const isLive = checkIfLiveOut(myHand, board, outCard, opHands);
+        if (isLive) {
+          liveCards.push(outCardStr);
+          allLiveOutCards.add(outCardStr);
+        } else {
+          deadCards.push(outCardStr);
+          allDeadOutCards.add(outCardStr);
+        }
+      }
+
+      draw.liveOuts = liveCards.length;
+      draw.liveOutCards = liveCards;
+      draw.deadOutCards = deadCards;
+    }
+
+    totalLiveOutCards = [...allLiveOutCards];
+    totalDeadOutCards = [...allDeadOutCards];
+    totalLiveOuts = totalLiveOutCards.length;
+    liveRuleOf4Equity = Math.min(totalLiveOuts * 4, 100);
+    liveRuleOf2Equity = Math.min(totalLiveOuts * 2, 100);
+  }
+
   return {
     draws,
     totalOuts,
     totalOutCards,
+    totalLiveOuts,
+    totalLiveOutCards,
+    totalDeadOutCards,
+    hasOpponentInfo,
     ruleOf4Equity,
     ruleOf2Equity,
+    liveRuleOf4Equity,
+    liveRuleOf2Equity,
     street,
     currentHandRank,
   };
+}
+
+// アウツカードが実際に相手全員に勝てるか判定
+function checkIfLiveOut(
+  myHand: Card[], board: Card[], outCard: Card, opHands: Card[][]
+): boolean {
+  // ターンの場合: outCardが来た最終ボードで勝てるか
+  // フロップの場合: outCardをボードに追加して、残り1枚は考慮せず判定
+  //（簡易版: outCardが来た時点で勝っているかを判定）
+  const newBoard = [...board, outCard];
+
+  // ボードが5枚未満ならまだ完全ではないが、
+  // フロップ→ターンの場合もoutCardが来た時点で勝っているかで判断
+  if (newBoard.length < 5) {
+    // フロップの場合: ターンにoutCardが来た想定で判定
+    // 残り1枚はまだ不明なので、outCard時点の5枚で評価
+    // （手札2 + ボード3 + outCard = 6枚から最強5枚）
+    const myCards = [...myHand, ...newBoard];
+    const myEval = evaluateHand(myCards);
+
+    for (const opHand of opHands) {
+      const opCards = [...opHand, ...newBoard];
+      const opEval = evaluateHand(opCards);
+      if (compareHandsPublic(myEval, opEval) <= 0) {
+        return false; // 相手に負けるか引き分け
+      }
+    }
+    return true;
+  }
+
+  // ターンの場合: 5枚ボードで最終判定
+  const myCards = [...myHand, ...newBoard];
+  const myEval = evaluateHand(myCards);
+
+  for (const opHand of opHands) {
+    const opCards = [...opHand, ...newBoard];
+    const opEval = evaluateHand(opCards);
+    if (compareHandsPublic(myEval, opEval) <= 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// compareHandsを外部から使えるようにするラッパー
+function compareHandsPublic(a: { rank: HandRank; values: number[] }, b: { rank: HandRank; values: number[] }): number {
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  for (let i = 0; i < Math.min(a.values.length, b.values.length); i++) {
+    if (a.values[i] !== b.values[i]) return a.values[i] - b.values[i];
+  }
+  return 0;
 }
 
 // --- フラッシュドロー ---
