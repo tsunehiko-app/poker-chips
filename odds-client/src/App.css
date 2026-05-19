@@ -1,0 +1,262 @@
+/* ===== ヘッダー ===== */
+.header {
+  background: var(--bg-header);
+  border-bottom: 2px solid var(--accent-red);
+  padding: 12px 0;
+}
+
+.header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-icon {
+  font-size: 28px;
+  color: var(--accent-red);
+}
+
+/* ===== メイン ===== */
+.main {
+  padding: 24px 0;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.section-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* ===== テーブルエリア ===== */
+.table-area {
+  background: linear-gradient(135deg, var(--bg-felt), var(--bg-felt-dark));
+  border-radius: 16px;
+  padding: 24px 16px;
+  margin-bottom: 16px;
+  border: 3px solid #0d4f28;
+  box-shadow: inset 0 2px 20px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* ===== プレイヤー行 ===== */
+.players-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.add-player-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 24px;
+  transition: all 0.2s;
+  margin-top: 20px;
+}
+
+.add-player-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: white;
+}
+
+/* ===== ボードエリア ===== */
+.board-area {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.board-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.board-cards {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.board-slot {
+  width: var(--card-width);
+  height: var(--card-height);
+  background: var(--bg-card-slot);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.board-slot.active {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 8px rgba(243, 156, 18, 0.4);
+}
+
+.board-slot.has-card {
+  background: white;
+  border-color: transparent;
+}
+
+.empty-slot-text {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ===== カード表示 ===== */
+.card-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.card-display.normal .card-display-rank {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.card-display.normal .card-display-suit {
+  font-size: 16px;
+}
+
+.card-display.small .card-display-rank {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.card-display.small .card-display-suit {
+  font-size: 12px;
+}
+
+/* ===== 音声セクション ===== */
+.voice-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+/* ===== アクションボタン ===== */
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.calc-btn {
+  padding: 14px 40px;
+  background: linear-gradient(135deg, var(--accent-red), #c0392b);
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calc-btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+.calc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.reset-btn {
+  padding: 14px 24px;
+  background: var(--bg-section);
+  color: var(--text-secondary);
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid #444;
+  transition: all 0.2s;
+}
+
+.reset-btn:hover {
+  background: #333;
+}
+
+.error-message {
+  text-align: center;
+  color: var(--accent-red);
+  padding: 8px;
+  font-size: 14px;
+}
+
+/* ===== フッター ===== */
+.footer {
+  background: var(--bg-header);
+  padding: 20px 0;
+  margin-top: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  border-top: 1px solid #333;
+}
+
+/* ===== レスポンシブ ===== */
+@media (max-width: 600px) {
+  .section-title {
+    font-size: 18px;
+  }
+  .table-area {
+    padding: 16px 10px;
+  }
+  .players-row {
+    gap: 8px;
+  }
+  .calc-btn {
+    padding: 12px 24px;
+    font-size: 14px;
+  }
+}

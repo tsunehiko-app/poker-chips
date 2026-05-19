@@ -1,0 +1,114 @@
+.card-grid-container {
+  background: var(--bg-section);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 8px;
+}
+
+.card-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.grid-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.grid-card {
+  width: 52px;
+  height: 40px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 700;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* スート別の背景色 — PokerListings風 */
+.grid-card.suit-spade {
+  background: #2c3e50;
+  color: #ecf0f1;
+}
+.grid-card.suit-heart {
+  background: #c0392b;
+  color: #ffffff;
+}
+.grid-card.suit-diamond {
+  background: #2980b9;
+  color: #ffffff;
+}
+.grid-card.suit-club {
+  background: #27ae60;
+  color: #ffffff;
+}
+
+.grid-card:hover:not(.used) {
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  z-index: 1;
+  filter: brightness(1.2);
+}
+
+.grid-card:active:not(.used) {
+  transform: scale(0.95);
+}
+
+.grid-card.used {
+  opacity: 0.15;
+  cursor: not-allowed;
+  transform: none;
+  filter: grayscale(1);
+}
+
+.gc-rank {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.gc-suit {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.grid-hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+/* スマホ対応 */
+@media (max-width: 720px) {
+  .grid-card {
+    width: calc((100% - 48px) / 13);
+    min-width: 32px;
+    height: 34px;
+    font-size: 12px;
+  }
+  .gc-rank {
+    font-size: 11px;
+  }
+  .gc-suit {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 400px) {
+  .grid-card {
+    min-width: 26px;
+    height: 30px;
+  }
+  .gc-rank {
+    font-size: 10px;
+  }
+  .gc-suit {
+    font-size: 8px;
+  }
+}

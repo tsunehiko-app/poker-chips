@@ -1,0 +1,111 @@
+.player-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  transition: all 0.2s;
+  min-width: 100px;
+}
+
+.player-slot.active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.player-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.player-remove {
+  background: rgba(231, 76, 60, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.player-remove:hover {
+  background: rgba(231, 76, 60, 0.7);
+  color: white;
+}
+
+.player-cards {
+  display: flex;
+  gap: 4px;
+}
+
+.player-card-slot {
+  width: var(--card-width);
+  height: var(--card-height);
+  background: var(--bg-card-slot);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.player-card-slot.active-slot {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
+  animation: slot-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes slot-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(243, 156, 18, 0.3); }
+  50% { box-shadow: 0 0 14px rgba(243, 156, 18, 0.6); }
+}
+
+.player-card-slot.has-card {
+  background: white;
+  border-color: transparent;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.player-card-slot.has-card:hover {
+  transform: scale(1.05);
+}
+
+.empty-card {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.player-results {
+  text-align: center;
+  margin-top: 4px;
+}
+
+.result-win {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0,0,0,0.35);
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+.result-tie {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 2px;
+}
